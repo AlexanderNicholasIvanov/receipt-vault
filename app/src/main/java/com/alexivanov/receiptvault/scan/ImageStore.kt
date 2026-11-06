@@ -1,10 +1,13 @@
 package com.alexivanov.receiptvault.scan
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -59,6 +62,35 @@ class ImageStore(private val context: Context) {
         StoredImage(out, lat, lng)
     }
 
+    /**
+     * Copies a stored receipt photo into the phone's Pictures/Receipt Vault
+     * folder, where Gallery and My Files show it. Needs no permission: apps may
+     * always add their own files to shared media on Android 10+.
+     */
+    suspend fun saveToPictures(path: String, displayName: String): Uri = withContext(Dispatchers.IO) {
+        val source = File(path)
+        require(source.isFile) { "The photo for this receipt is missing." }
+        val resolver = context.contentResolver
+        val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$PICTURES_FOLDER")
+            // Hidden from other apps until the bytes are fully written.
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(collection, values) ?: error("The phone's storage refused the file.")
+        try {
+            resolver.openOutputStream(uri)?.use { out -> source.inputStream().use { it.copyTo(out) } }
+                ?: error("Couldn't write to the phone's storage.")
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+        uri
+    }
+
     fun delete(path: String?) {
         if (path.isNullOrBlank()) return
         val file = File(path)
@@ -69,5 +101,8 @@ class ImageStore(private val context: Context) {
     companion object {
         /** Long edge of stored photos; plenty for OCR and zooming in on fine print. */
         private const val MAX_EDGE = 2400
+
+        /** Folder under Pictures that downloaded receipt photos go to. */
+        const val PICTURES_FOLDER = "Receipt Vault"
     }
 }

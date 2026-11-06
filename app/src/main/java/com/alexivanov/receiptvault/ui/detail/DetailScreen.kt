@@ -31,6 +31,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -46,14 +50,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.alexivanov.receiptvault.R
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.ImageNames
+import com.alexivanov.receiptvault.scan.ImageStore
 import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -72,6 +80,8 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
     var showImage by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
 
     Scaffold(
         topBar = {
@@ -90,6 +100,7 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val r = receipt ?: return@Scaffold
         Column(
@@ -103,6 +114,32 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(16.dp)).clickable { showImage = true },
                 )
+                OutlinedButton(
+                    enabled = !saving,
+                    onClick = {
+                        saving = true
+                        scope.launch {
+                            val saved = runCatching {
+                                app.images.saveToPictures(path, ImageNames.forReceipt(r.merchant, r.purchasedAt))
+                            }
+                            saving = false
+                            saved.onSuccess { uri ->
+                                val result = snackbar.showSnackbar(
+                                    "Saved to Pictures/${ImageStore.PICTURES_FOLDER}",
+                                    actionLabel = "View",
+                                    duration = SnackbarDuration.Long,
+                                )
+                                if (result == SnackbarResult.ActionPerformed) viewImage(context, uri)
+                            }.onFailure { e ->
+                                snackbar.showSnackbar("Couldn't save the image: ${e.message ?: "unknown error"}")
+                            }
+                        }
+                    },
+                ) {
+                    Icon(painterResource(R.drawable.ic_download), contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (saving) "Saving…" else "Download image")
+                }
             }
             val category = Category.fromName(r.category)
             Text(r.merchant, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -209,6 +246,14 @@ private fun openMap(context: android.content.Context, r: Receipt) {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     } catch (_: ActivityNotFoundException) {
         context.startActivity(Intent(Intent.ACTION_VIEW, ("https://maps.google.com/?q=" + Uri.encode(query ?: "${r.latitude},${r.longitude}")).toUri()))
+    }
+}
+
+private fun viewImage(context: android.content.Context, uri: Uri) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "image/jpeg").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    } catch (_: ActivityNotFoundException) {
+        // No viewer: the file is still saved where the snackbar said.
     }
 }
 
