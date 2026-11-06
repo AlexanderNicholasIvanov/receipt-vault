@@ -18,6 +18,8 @@ enum class SortOrder(val label: String) {
  */
 data class ReceiptFilter(
     val categories: Set<Category> = emptySet(),
+    /** Keeps receipts carrying any of these tags (case-insensitive). */
+    val tags: Set<String> = emptySet(),
     val minCents: Long? = null,
     val maxCents: Long? = null,
     /** Inclusive custom date range; when set it replaces the period chips. */
@@ -29,10 +31,11 @@ data class ReceiptFilter(
 
     /** How many filters narrow the list (sorting doesn't count). */
     val activeCount: Int
-        get() = listOf(categories.isNotEmpty(), minCents != null || maxCents != null, hasDates).count { it }
+        get() = listOf(categories.isNotEmpty(), tags.isNotEmpty(), minCents != null || maxCents != null, hasDates).count { it }
 
     fun matches(r: Receipt, zone: ZoneId = ZoneId.systemDefault()): Boolean {
         if (categories.isNotEmpty() && Category.fromName(r.category) !in categories) return false
+        if (tags.isNotEmpty() && tags.none { Tags.has(r.tags, it) }) return false
         if (minCents != null && r.totalCents < minCents) return false
         if (maxCents != null && r.totalCents > maxCents) return false
         if (hasDates) {

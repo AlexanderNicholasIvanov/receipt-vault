@@ -119,13 +119,36 @@ class AppSmokeTest {
         compose.onNodeWithText("Filters").assertExists()
     }
 
-    private fun addManualReceipt(merchant: String, total: String) {
+    @Test
+    fun `tagged receipts can be filtered by tag and reported`() {
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        addManualReceipt("Corner Cafe", "25.60", tags = "work, #Berlin trip")
+        compose.onNodeWithText("#work   #Berlin trip").performScrollTo().assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
+        addManualReceipt("Shell", "40.00")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Shell"), 10_000)
+        compose.onNodeWithContentDescription("Expense report").assertExists()
+
+        compose.onNodeWithText("Filters").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("#Berlin trip"), 5_000)
+        compose.onNodeWithText("#work").performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
+
+        compose.waitUntilAtLeastOneExists(hasText("Filters (1)"), 5_000)
+        compose.waitUntilDoesNotExist(hasText("Shell"), 5_000)
+        compose.onNodeWithText("Corner Cafe").assertExists()
+    }
+
+    private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
         compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
         compose.onNodeWithText("Merchant").performTextInput(merchant)
         compose.onNodeWithText("Total").performTextInput(total)
+        if (tags != null) compose.onNodeWithText("Tags").performScrollTo().performTextInput(tags)
         compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
         compose.waitUntilAtLeastOneExists(hasText("$" + total), 10_000)
     }

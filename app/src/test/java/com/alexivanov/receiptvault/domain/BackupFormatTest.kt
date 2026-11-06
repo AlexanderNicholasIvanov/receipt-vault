@@ -18,6 +18,11 @@ class BackupFormatTest {
         val future = """{"app":"receipt-vault","format":1,"someNewThing":true,
             "receipts":[{"merchant":"B","purchasedAt":2,"totalCents":3,"currency":"EUR","tags":["work"]}]}"""
         assertEquals("B", BackupFormat.decode(future).receipts.single().merchant)
+        assertEquals(listOf("work"), BackupFormat.decode(future).receipts.single().tags)
+
+        // Backups made before tags existed have none.
+        val old = """{"app":"receipt-vault","format":1,"receipts":[{"merchant":"C","purchasedAt":2,"totalCents":3,"currency":"EUR"}]}"""
+        assertEquals(emptyList<String>(), BackupFormat.decode(old).receipts.single().tags)
     }
 
     @Test

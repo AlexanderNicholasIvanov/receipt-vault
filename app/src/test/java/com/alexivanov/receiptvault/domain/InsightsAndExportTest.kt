@@ -66,7 +66,7 @@ class InsightsAndExportTest {
 
     @Test
     fun `csv quotes, escapes and folds line items`() {
-        val r = receipt(7, LocalDate.of(2026, 11, 1), 1234, merchant = "Joe's, \"Best\" Diner").copy(notes = "=SUM(A1)")
+        val r = receipt(7, LocalDate.of(2026, 11, 1), 1234, merchant = "Joe's, \"Best\" Diner").copy(notes = "=SUM(A1)", tags = "work,Berlin trip")
         val csv = CsvExport.build(listOf(r), listOf(LineItem(receiptId = 7, position = 0, name = "Pie", quantity = 2, priceCents = 800)), utc)
         val lines = csv.trimEnd().split("\r\n")
         assertEquals(2, lines.size)
@@ -75,6 +75,8 @@ class InsightsAndExportTest {
         assertTrue(lines[1].contains(",'=SUM(A1),"))
         assertTrue(lines[1].contains("Pie x2 = 8.00"))
         assertTrue(lines[1].contains(",12.34,USD,"))
+        assertTrue(lines[0].endsWith(",items,tags"))
+        assertTrue(lines[1].endsWith(",\"work, Berlin trip\""))
     }
 
     @Test

@@ -78,8 +78,28 @@ class MigrationTest {
         assertMigrated()
     }
 
+    @Test
+    fun `v4 install keeps receipts, trash and items, with no tags yet`() {
+        createAtVersion(4) { db ->
+            db.execSQL(
+                """INSERT INTO receipts (id, merchant, address, phone, category, purchasedAt, subtotalCents, taxCents,
+                   tipCents, discountCents, totalCents, currency, notes, imagePath, ocrText, createdAt, updatedAt, deletedAt)
+                   VALUES (7, 'Corner Cafe', '1 Main St', NULL, 'DINING', 1000, 2000, 160, 400, NULL, 2560, 'USD',
+                   'lunch', NULL, 'CORNER CAFE', 1, 2, NULL),
+                   (8, 'Old Diner', NULL, NULL, 'DINING', 900, NULL, NULL, NULL, NULL, 500, 'USD',
+                   '', NULL, '', 1, 2, 12345)""",
+            )
+            db.execSQL(LINE_ITEM)
+        }
+        assertMigrated { dao ->
+            // A receipt that was in the trash stays there.
+            assertEquals(listOf(8L), runBlocking { dao.getTrash() }.map { it.id })
+            assertEquals(12345L, runBlocking { dao.get(8) }!!.deletedAt)
+        }
+    }
+
     /** Opens the database with the current [AppDatabase], which runs the shipped migrations. */
-    private fun assertMigrated() {
+    private fun assertMigrated(extra: (ReceiptDao) -> Unit = {}) {
         val room = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, name).build()
         try {
             val dao = room.receiptDao()
@@ -91,6 +111,8 @@ class MigrationTest {
             assertEquals("lunch", r.notes)
             assertNull("an upgraded receipt must not land in the trash", r.deletedAt)
             assertEquals(listOf(7L), runBlocking { dao.getAll() }.map { it.id })
+            assertEquals("", r.tags)
+            extra(dao)
             // The receipts table is rebuilt; its line items must not be cascade-deleted along the way.
             assertEquals(listOf("Latte"), runBlocking { dao.getItems(7) }.map { it.name })
 

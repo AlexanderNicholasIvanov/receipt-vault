@@ -11,7 +11,7 @@ object CsvExport {
 
     private val HEADER = listOf(
         "id", "date", "time", "merchant", "category", "subtotal", "tax", "tip", "discount", "total", "currency",
-        "receipt_address", "notes", "items",
+        "receipt_address", "notes", "items", "tags",
     )
 
     fun build(receipts: List<Receipt>, items: List<LineItem>, zone: ZoneId = ZoneId.systemDefault()): String {
@@ -39,6 +39,7 @@ object CsvExport {
                 r.address.orEmpty(),
                 r.notes,
                 itemCell,
+                Tags.decode(r.tags).joinToString(", "),
             )
             sb.append(row.joinToString(",") { escape(it) }).append("\r\n")
         }
