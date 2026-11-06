@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Update check against GitHub Releases. OCR runs fully on-device. -->
+    <!-- Update check and download from GitHub Releases. OCR runs fully on-device. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Optional: tag where a receipt was scanned. The app works if denied. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- In-app updates: hand a downloaded, verified release APK to the system
+         installer. The user still confirms every install. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- No CAMERA permission: capture goes through the ML Kit document scanner
          or the system camera app, neither of which needs it. -->

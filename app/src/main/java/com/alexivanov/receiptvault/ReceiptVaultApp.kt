@@ -8,13 +8,12 @@ import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.scan.ImageStore
 import com.alexivanov.receiptvault.scan.LocationService
 import com.alexivanov.receiptvault.scan.TextReader
+import com.alexivanov.receiptvault.update.GitHubApkDownloader
 import com.alexivanov.receiptvault.update.UpdateChecker
-import com.alexivanov.receiptvault.update.UpdateInfo
+import com.alexivanov.receiptvault.update.UpdateController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class ReceiptVaultApp : Application() {
@@ -38,23 +37,18 @@ class AppContainer(context: Context) {
     val textReader = TextReader(context)
     val location = LocationService(context)
 
-    private val updateChecker = UpdateChecker(BuildConfig.UPDATE_REPO)
-    private val _update = MutableStateFlow<UpdateInfo?>(null)
+    private val apkDownloader = GitHubApkDownloader(context).also { it.clearDownloads() }
 
-    /** A newer release on GitHub, if the last check found one. */
-    val update: StateFlow<UpdateInfo?> = _update
-    private var checkedThisLaunch = false
+    /** Check GitHub Releases, download the newer APK in-app, hand it to the installer. */
+    val updates = UpdateController(
+        scope = appScope,
+        source = UpdateChecker(BuildConfig.UPDATE_REPO),
+        downloader = apkDownloader,
+        currentVersionCode = BuildConfig.VERSION_CODE,
+    )
 
-    /** Automatic check, at most once per process. */
-    fun checkForUpdateOnce() {
-        if (checkedThisLaunch) return
-        checkedThisLaunch = true
-        appScope.launch { checkForUpdate() }
-    }
-
-    suspend fun checkForUpdate(): UpdateChecker.Outcome {
-        val outcome = updateChecker.check(BuildConfig.VERSION_CODE)
-        if (outcome is UpdateChecker.Outcome.Newer) _update.value = outcome.info
-        return outcome
+    /** Launch-time check, unless the user turned it off in Settings. */
+    fun checkForUpdatesOnLaunch() {
+        appScope.launch { if (settings.current().autoCheckUpdates) updates.checkAutomatically() }
     }
 }

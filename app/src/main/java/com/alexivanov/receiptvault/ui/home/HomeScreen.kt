@@ -1,6 +1,5 @@
 package com.alexivanov.receiptvault.ui.home
 
-import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -45,7 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.core.net.toUri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,7 +66,8 @@ import com.alexivanov.receiptvault.ui.appViewModel
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.CaptureSource
-import com.alexivanov.receiptvault.update.UpdateInfo
+import com.alexivanov.receiptvault.ui.update.UpdateCard
+import com.alexivanov.receiptvault.update.UpdateState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,8 +118,15 @@ fun HomeScreen(
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
-            ui.update?.let { info ->
-                item { UpdateBanner(info, onDismiss = { vm.dismissUpdate(info.versionCode) }) }
+            ui.update?.let { state ->
+                item {
+                    UpdateCard(
+                        controller = vm.updates,
+                        state = state,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        onLater = (state as? UpdateState.Available)?.let { a -> { vm.dismissUpdate(a.info.versionCode) } },
+                    )
+                }
             }
             item {
                 LazyRow(
@@ -287,23 +292,5 @@ private fun EmptyState(onScan: () -> Unit) {
         )
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = onScan) { Text("Add your first receipt") }
-    }
-}
-
-@Composable
-private fun UpdateBanner(info: UpdateInfo, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-    ) {
-        Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Update ${info.versionName} available", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = onDismiss) { Text("Later") }
-            Spacer(Modifier.width(4.dp))
-            TextButton(onClick = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, info.apkUrl.toUri()))
-            }) { Text("Download") }
-        }
     }
 }

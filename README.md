@@ -22,7 +22,11 @@ Text recognition runs **on the phone** (ML Kit), so receipts and photos never le
 2. Open the downloaded file. If One UI asks, allow your browser (Samsung Internet or Chrome) to **Install unknown apps**.
 3. Tap **Install**.
 
-Updates install over the old version and keep your data, because every release is signed with the same key. The app checks for new releases on launch and shows a *Download* banner. You can also check from **Settings → Version**.
+### Updating
+
+Open **Settings → Updates → Check for updates**, or wait for the banner on the home screen (the app checks once per launch; turn this off with *Check automatically*). Tap **Download & install**: the app downloads the APK from the latest GitHub Release and verifies it, then opens Android's installer. The checks are: the size and SHA-256 match what GitHub published, it is this app, it is a newer version, and it is signed with the same key. The first time, Android asks you to allow *Install unknown apps* for Receipt Vault. Turn it on, come back, and tap **Install**.
+
+Updates install over the old version and keep your receipts. If the installed copy is a debug build (signed with a different key), the app says so instead of failing: export to CSV, uninstall, then install the release.
 
 > On some One UI builds, **Auto Blocker** (Settings → Security and privacy → Auto Blocker) blocks apps from outside the Galaxy Store and Play Store. Turn it off while you install, then turn it back on.
 
@@ -53,7 +57,7 @@ Layout:
 | `.../scan/` | ML Kit OCR, photo storage, location and geocoding |
 | `.../data/` | Room database (`receipts`, `line_items`) and DataStore settings |
 | `.../ui/` | Jetpack Compose screens: home, review/edit, detail, insights, settings |
-| `.../update/` | GitHub Releases update check |
+| `.../update/` | GitHub Releases check, in-app APK download + verification, installer hand-off |
 
 The receipt parser is heuristic. If a real receipt is misread, add its text as a case in `ReceiptParserTest` and fix the parser against it.
 
