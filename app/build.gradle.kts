@@ -85,6 +85,19 @@ android {
         }
     }
 
+    testOptions {
+        // Robolectric UI smoke tests need merged resources and the manifest.
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric's Android 16 runtime reaches into FileDescriptor internals on JDK 17+.
+            it.jvmArgs(
+                "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--add-opens=java.base/java.io=ALL-UNNAMED",
+            )
+        }
+    }
+
     lint {
         abortOnError = true
         warningsAsErrors = false
@@ -132,4 +145,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

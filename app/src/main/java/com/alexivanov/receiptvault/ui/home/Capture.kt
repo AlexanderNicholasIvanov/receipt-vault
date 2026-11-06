@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import com.alexivanov.receiptvault.ui.review.CaptureSource
-import com.google.mlkit.vision.documentscanner.GmsDocumentScanner
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
@@ -42,17 +41,6 @@ fun rememberCaptureActions(
     val activity = LocalActivity.current
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    val scanner: GmsDocumentScanner = remember {
-        GmsDocumentScanning.getClient(
-            GmsDocumentScannerOptions.Builder()
-                .setGalleryImportAllowed(false)
-                .setPageLimit(1)
-                .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-                .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
-                .build(),
-        )
-    }
 
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -89,6 +77,15 @@ fun rememberCaptureActions(
 
     fun launchScanner() {
         if (activity == null) return launchCamera()
+        // Created on demand: the client needs Google Play services, which only the scanner path uses.
+        val scanner = GmsDocumentScanning.getClient(
+            GmsDocumentScannerOptions.Builder()
+                .setGalleryImportAllowed(false)
+                .setPageLimit(1)
+                .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+                .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+                .build(),
+        )
         scanner.getStartScanIntent(activity)
             .addOnSuccessListener { sender -> scanLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
             .addOnFailureListener {
