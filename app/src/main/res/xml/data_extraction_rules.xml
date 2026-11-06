@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Receipts are personal financial data: they stay on the device. Use the
+     in-app CSV export to move data elsewhere. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="file" path="receipts/" />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

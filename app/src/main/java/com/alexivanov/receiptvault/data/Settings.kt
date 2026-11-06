@@ -1,0 +1,49 @@
+package com.alexivanov.receiptvault.data
+
+import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.alexivanov.receiptvault.domain.Money
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import java.util.Locale
+
+private val Context.dataStore by preferencesDataStore("settings")
+
+data class AppSettings(
+    /** Attach the phone's location to receipts captured with the camera. */
+    val tagLocation: Boolean = true,
+    /** Currency used when a receipt does not show one. */
+    val defaultCurrency: String = Money.defaultCurrency(),
+    /** Read 03/04/2026 as 3 April instead of March 4. */
+    val dayFirstDates: Boolean = Locale.getDefault().country !in setOf("US", "CA", "PH"),
+    val dismissedUpdateVersionCode: Int = 0,
+)
+
+class SettingsRepository(private val context: Context) {
+    private val tagLocation = booleanPreferencesKey("tag_location")
+    private val currency = stringPreferencesKey("default_currency")
+    private val dayFirst = booleanPreferencesKey("day_first_dates")
+    private val dismissedUpdate = intPreferencesKey("dismissed_update")
+
+    val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
+        val defaults = AppSettings()
+        AppSettings(
+            tagLocation = p[tagLocation] ?: defaults.tagLocation,
+            defaultCurrency = p[currency] ?: defaults.defaultCurrency,
+            dayFirstDates = p[dayFirst] ?: defaults.dayFirstDates,
+            dismissedUpdateVersionCode = p[dismissedUpdate] ?: 0,
+        )
+    }
+
+    suspend fun current(): AppSettings = settings.first()
+
+    suspend fun setTagLocation(value: Boolean) = context.dataStore.edit { it[tagLocation] = value }
+    suspend fun setDefaultCurrency(value: String) = context.dataStore.edit { it[currency] = value }
+    suspend fun setDayFirstDates(value: Boolean) = context.dataStore.edit { it[dayFirst] = value }
+    suspend fun setDismissedUpdate(value: Int) = context.dataStore.edit { it[dismissedUpdate] = value }
+}
