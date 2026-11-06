@@ -3,6 +3,7 @@ package com.alexivanov.receiptvault
 import android.app.Application
 import android.content.Context
 import com.alexivanov.receiptvault.data.AppDatabase
+import com.alexivanov.receiptvault.data.BackupManager
 import com.alexivanov.receiptvault.data.ReceiptRepository
 import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.scan.ImageStore
@@ -33,6 +34,7 @@ class AppContainer(context: Context) {
     val images = ImageStore(context)
     val receipts = ReceiptRepository(database.receiptDao(), images)
     val settings = SettingsRepository(context)
+    val backup = BackupManager(receipts, images, context.cacheDir, BuildConfig.VERSION_NAME)
     val textReader = TextReader(context)
 
     private val apkDownloader = GitHubApkDownloader(context).also { it.clearDownloads() }

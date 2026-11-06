@@ -11,7 +11,7 @@ An Android app for Samsung Galaxy phones on **One UI 8 (Android 16)** and newer 
 
 You review and correct everything before saving. A warning appears if subtotal − discount + tax + tip doesn't add up to the total.
 
-The home screen shows what you spent this month, last month, this year or all time, with tips and tax totals and a search box. **Insights** adds a monthly spending chart, a category breakdown, top merchants and your average tip. **Settings** can export everything to CSV for Excel or Google Sheets.
+The home screen shows what you spent this month, last month, this year or all time, with tips and tax totals and a search box. **Insights** adds a monthly spending chart, a category breakdown, top merchants and your average tip. **Settings** can export everything to CSV for Excel or Google Sheets, and save a full **backup** (receipts, items and photos in one `.zip`) to Google Drive, a USB drive or any folder, then **restore** it on a new phone.
 
 Text recognition runs **on the phone** (ML Kit), so receipts and photos never leave the device. The app only goes online to check GitHub for updates, and it never asks for your location.
 
@@ -25,7 +25,7 @@ Text recognition runs **on the phone** (ML Kit), so receipts and photos never le
 
 Open **Settings → Updates → Check for updates**, or wait for the banner on the home screen (the app checks once per launch; turn this off with *Check automatically*). Tap **Download & install**: the app downloads the APK from the latest GitHub Release and verifies it, then opens Android's installer. The checks are: the size and SHA-256 match what GitHub published, it is this app, it is a newer version, and it is signed with the same key. The first time, Android asks you to allow *Install unknown apps* for Receipt Vault. Turn it on, come back, and tap **Install**.
 
-Updates install over the old version and keep your receipts. If the installed copy is a debug build (signed with a different key), the app says so instead of failing: export to CSV, uninstall, then install the release.
+Updates install over the old version and keep your receipts. If the installed copy is a debug build (signed with a different key), the app says so instead of failing: back up (Settings → Back up receipts), uninstall, install the release, then restore.
 
 > On some One UI builds, **Auto Blocker** (Settings → Security and privacy → Auto Blocker) blocks apps from outside the Galaxy Store and Play Store. Turn it off while you install, then turn it back on.
 
@@ -65,6 +65,6 @@ The receipt parser is heuristic. If a real receipt is misread, add its text as a
 
 - `ci.yml` runs lint, unit tests and a debug build on every push and PR.
 - `release.yml` runs on every push to `main`. It builds a release APK signed with the release key, tags it `v1.0.<run number>` and publishes it as a GitHub Release with the asset `ReceiptVault.apk`.
-- The signing key lives in the repository's Actions secrets: `RV_KEYSTORE_B64`, `RV_KEYSTORE_PASSWORD`, `RV_KEY_ALIAS` and `RV_KEY_PASSWORD`. **Keep an offline backup of the keystore.** If it is lost, future builds cannot update existing installs, and users would have to uninstall, which deletes their receipts. Export to CSV first.
+- The signing key lives in the repository's Actions secrets: `RV_KEYSTORE_B64`, `RV_KEYSTORE_PASSWORD`, `RV_KEY_ALIAS` and `RV_KEY_PASSWORD`. **Keep an offline backup of the keystore.** If it is lost, future builds cannot update existing installs, and users would have to uninstall, which deletes their receipts. Back up first (Settings → Back up receipts), then restore after reinstalling.
 
 **Roll back a bad release:** delete the bad GitHub Release so the previous one becomes *latest*. Phones that already updated need the older APK installed after uninstalling, because Android blocks downgrades. Usually it's better to revert the commit on `main`, which publishes a fixed, higher version.

@@ -1,6 +1,8 @@
 package com.alexivanov.receiptvault.ui.settings
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +45,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.BuildConfig
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
+import com.alexivanov.receiptvault.domain.BackupException
+import com.alexivanov.receiptvault.domain.BackupFormat
 import com.alexivanov.receiptvault.domain.CsvExport
+import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import com.alexivanov.receiptvault.ui.shareFile
 import com.alexivanov.receiptvault.ui.update.UpdateCard
@@ -66,6 +71,45 @@ fun SettingsScreen(onBack: () -> Unit) {
     val updateState by app.updates.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(settings.defaultCurrency) { currency = settings.defaultCurrency }
+
+    var backupBusy by remember { mutableStateOf(false) }
+    fun runBackupTask(task: suspend () -> String) {
+        backupBusy = true
+        scope.launch {
+            val message = try {
+                task()
+            } catch (e: BackupException) {
+                e.message ?: "That backup couldn't be read."
+            } catch (e: Exception) {
+                "Something went wrong: ${e.message ?: e::class.java.simpleName}"
+            }
+            backupBusy = false
+            snackbar.showSnackbar(message)
+        }
+    }
+    val createBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) {
+            runBackupTask {
+                val count = context.contentResolver.openOutputStream(uri, "wt")?.use { app.backup.export(it) }
+                    ?: error("Couldn't write to that location.")
+                app.settings.setLastBackupAt(System.currentTimeMillis())
+                "Backed up $count receipt${if (count == 1) "" else "s"}."
+            }
+        }
+    }
+    val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runBackupTask {
+                val result = context.contentResolver.openInputStream(uri)?.use { app.backup.restore(it) }
+                    ?: error("Couldn't open that file.")
+                buildString {
+                    append("Restored ${result.added} receipt${if (result.added == 1) "" else "s"}")
+                    if (result.skipped > 0) append(" (${result.skipped} already on this phone)")
+                    append(".")
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -103,8 +147,28 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Column(Modifier.padding(horizontal = 16.dp)) { SectionTitle("Your data") }
             ListItem(
+                headlineContent = { Text("Back up receipts") },
+                supportingContent = {
+                    Text(
+                        "Save every receipt, item and photo in one file, on Google Drive, a USB drive or any folder. " +
+                            if (settings.lastBackupAt > 0) "Last backup: ${formatDateTime(settings.lastBackupAt)}." else "No backup yet.",
+                    )
+                },
+                trailingContent = { if (backupBusy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) },
+                modifier = Modifier.clickable(enabled = !backupBusy) {
+                    createBackup.launch(BackupFormat.fileName(LocalDate.now()))
+                },
+            )
+            ListItem(
+                headlineContent = { Text("Restore from backup") },
+                supportingContent = { Text("Adds the receipts from a backup file. Receipts already on this phone are kept and never duplicated.") },
+                modifier = Modifier.clickable(enabled = !backupBusy) {
+                    openBackup.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+                },
+            )
+            ListItem(
                 headlineContent = { Text("Export to CSV") },
-                supportingContent = { Text("Every receipt with amounts, tips, tax, places and items. Opens in Excel or Google Sheets.") },
+                supportingContent = { Text("Every receipt with amounts, tips, tax, store address and items. Opens in Excel or Google Sheets.") },
                 modifier = Modifier.clickable {
                     scope.launch {
                         val file = withContext(Dispatchers.IO) {
@@ -120,7 +184,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             ListItem(
                 headlineContent = { Text("Privacy") },
                 supportingContent = {
-                    Text("Receipts, photos and text recognition stay on this phone. The app only goes online to check GitHub for updates and to look up addresses on the map.")
+                    Text("Receipts, photos and text recognition stay on this phone unless you save a backup somewhere else. The app only goes online to check GitHub for updates, and never asks for your location.")
                 },
             )
             HorizontalDivider()
