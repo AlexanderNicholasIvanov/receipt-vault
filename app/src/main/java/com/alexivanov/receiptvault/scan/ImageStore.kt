@@ -4,11 +4,17 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
+import androidx.core.graphics.createBitmap
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
+import com.alexivanov.receiptvault.domain.PageLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -85,6 +91,41 @@ class ImageStore(private val context: Context) {
         uri
     }
 
+    /**
+     * Stacks already-imported pages (from [import]) into one tall image, so a
+     * long receipt is still one photo everywhere else in the app.
+     */
+    suspend fun stitch(pages: List<File>): File = withContext(Dispatchers.IO) {
+        if (pages.size == 1) return@withContext adopt(pages.single())
+        val sizes = pages.map { f ->
+            val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            f.inputStream().use { BitmapFactory.decodeStream(it, null, o) }
+            o.outWidth to o.outHeight
+        }
+        val layout = PageLayout.of(sizes, MAX_STITCHED_WIDTH, MAX_STITCHED_HEIGHT)
+        // RGB_565 halves the memory of a very tall canvas; receipts don't need alpha or subtle colour.
+        val canvasBitmap = createBitmap(layout.width, layout.height, Bitmap.Config.RGB_565)
+        try {
+            val canvas = Canvas(canvasBitmap)
+            canvas.drawColor(Color.WHITE)
+            val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+            pages.forEachIndexed { i, f ->
+                val page = f.inputStream().use { BitmapFactory.decodeStream(it) } ?: error("Couldn't read page ${i + 1}.")
+                try {
+                    val top = layout.tops[i].toFloat()
+                    canvas.drawBitmap(page, null, RectF(0f, top, layout.width.toFloat(), top + layout.pageHeights[i]), paint)
+                } finally {
+                    page.recycle()
+                }
+            }
+            File(dir, "${UUID.randomUUID()}.jpg").also { out ->
+                out.outputStream().use { canvasBitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+            }
+        } finally {
+            canvasBitmap.recycle()
+        }
+    }
+
     /** Copies an already-processed photo (e.g. from a backup) into storage under a new name. */
     fun adopt(source: File): File {
         val out = File(dir, "${UUID.randomUUID()}.jpg")
@@ -102,6 +143,10 @@ class ImageStore(private val context: Context) {
     companion object {
         /** Long edge of stored photos; plenty for OCR and zooming in on fine print. */
         private const val MAX_EDGE = 2400
+
+        /** Stitched multi-page images: at most 1600 x 12000 (about 38 MB while drawing, in RGB_565). */
+        private const val MAX_STITCHED_WIDTH = 1600
+        private const val MAX_STITCHED_HEIGHT = 12_000
 
         /** Folder under Pictures that downloaded receipt photos go to. */
         const val PICTURES_FOLDER = "Receipt Vault"

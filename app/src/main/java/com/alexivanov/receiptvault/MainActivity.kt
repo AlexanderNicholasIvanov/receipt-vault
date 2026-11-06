@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import com.alexivanov.receiptvault.domain.AppLockPolicy
+import com.alexivanov.receiptvault.scan.PdfPages
 import com.alexivanov.receiptvault.ui.AppNav
 import com.alexivanov.receiptvault.ui.lock.LockScreen
 import com.alexivanov.receiptvault.ui.theme.ReceiptVaultTheme
@@ -28,8 +29,8 @@ import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
 
-    /** Images shared into the app ("Share > Receipt Vault" from Gallery). */
-    private val shared = Channel<Uri>(Channel.BUFFERED)
+    /** Photos or a PDF shared into the app ("Share > Receipt Vault"), or a PDF opened with it. */
+    private val shared = Channel<List<Uri>>(Channel.BUFFERED)
 
     /** Receipts to open, from tapping a reminder notification. */
     private val openReceipts = Channel<Long>(Channel.CONFLATED)
@@ -102,12 +103,25 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         intent?.getLongExtra(EXTRA_RECEIPT_ID, -1L)?.takeIf { it > 0 }?.let { openReceipts.trySend(it) }
-        if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("image/") != true) return
-        IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let { shared.trySend(it) }
+        sharedUris(intent).takeIf { it.isNotEmpty() }?.let { shared.trySend(it) }
     }
 
     companion object {
         const val EXTRA_RECEIPT_ID = "receipt_id"
+
+        /** Pages from a share or "Open with": one photo, several photos of one long receipt, or a PDF. */
+        internal fun sharedUris(intent: Intent?): List<Uri> {
+            val type = intent?.type.orEmpty()
+            val supported = type.startsWith("image/") || type == "application/pdf"
+            if (intent == null || !supported) return emptyList()
+            val uris = when (intent.action) {
+                Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+                Intent.ACTION_SEND_MULTIPLE -> IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+                Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+                else -> emptyList()
+            }
+            return uris.take(PdfPages.MAX_PAGES)
+        }
     }
 
 }

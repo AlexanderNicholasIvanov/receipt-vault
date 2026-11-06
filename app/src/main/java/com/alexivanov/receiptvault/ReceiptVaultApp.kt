@@ -10,6 +10,7 @@ import com.alexivanov.receiptvault.data.BackupManager
 import com.alexivanov.receiptvault.data.ReceiptRepository
 import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.scan.ImageStore
+import com.alexivanov.receiptvault.scan.PdfPages
 import com.alexivanov.receiptvault.scan.TextReader
 import com.alexivanov.receiptvault.update.GitHubApkDownloader
 import com.alexivanov.receiptvault.update.UpdateChecker
@@ -32,7 +33,7 @@ class ReceiptVaultApp : Application() {
 }
 
 /** Hand-rolled dependency container; the app is small enough not to need a DI framework. */
-class AppContainer(context: Context) {
+class AppContainer(val context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val database = AppDatabase.create(context)
@@ -41,6 +42,7 @@ class AppContainer(context: Context) {
     val settings = SettingsRepository(context)
     val backup = BackupManager(receipts, images, context.cacheDir, BuildConfig.VERSION_NAME)
     val textReader = TextReader(context)
+    val pdfPages = PdfPages(context)
     val alerts = AlertChecker(receipts, settings, AndroidNotifier(context))
 
     private val apkDownloader = GitHubApkDownloader(context).also { it.clearDownloads() }
