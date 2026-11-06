@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ReceiptDao {
-    @Query("SELECT * FROM receipts ORDER BY purchasedAt DESC, id DESC")
+    @Query("SELECT * FROM receipts WHERE deletedAt IS NULL ORDER BY purchasedAt DESC, id DESC")
     fun observeAll(): Flow<List<Receipt>>
+
+    @Query("SELECT * FROM receipts WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC, id DESC")
+    fun observeTrash(): Flow<List<Receipt>>
 
     @Query("SELECT * FROM receipts WHERE id = :id")
     fun observe(id: Long): Flow<Receipt?>
@@ -19,8 +22,24 @@ interface ReceiptDao {
     @Query("SELECT * FROM receipts WHERE id = :id")
     suspend fun get(id: Long): Receipt?
 
-    @Query("SELECT * FROM receipts ORDER BY purchasedAt DESC, id DESC")
+    @Query("SELECT * FROM receipts WHERE deletedAt IS NULL ORDER BY purchasedAt DESC, id DESC")
     suspend fun getAll(): List<Receipt>
+
+    /** Including the trash. */
+    @Query("SELECT * FROM receipts")
+    suspend fun getEverything(): List<Receipt>
+
+    @Query("SELECT * FROM receipts WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<Receipt>
+
+    @Query("SELECT * FROM receipts WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
+    suspend fun getTrashedBefore(cutoff: Long): List<Receipt>
+
+    @Query("SELECT * FROM receipts WHERE deletedAt IS NOT NULL")
+    suspend fun getTrash(): List<Receipt>
+
+    @Query("UPDATE receipts SET deletedAt = :deletedAt WHERE id IN (:ids)")
+    suspend fun setDeletedAt(ids: List<Long>, deletedAt: Long?)
 
     @Query("SELECT * FROM line_items WHERE receiptId = :receiptId ORDER BY position")
     fun observeItems(receiptId: Long): Flow<List<LineItem>>
@@ -28,8 +47,12 @@ interface ReceiptDao {
     @Query("SELECT * FROM line_items WHERE receiptId = :receiptId ORDER BY position")
     suspend fun getItems(receiptId: Long): List<LineItem>
 
-    @Query("SELECT * FROM line_items")
+    /** Items of receipts that aren't in the trash. */
+    @Query("SELECT line_items.* FROM line_items JOIN receipts ON receipts.id = line_items.receiptId WHERE receipts.deletedAt IS NULL")
     suspend fun getAllItems(): List<LineItem>
+
+    @Query("SELECT * FROM line_items WHERE receiptId IN (:ids)")
+    suspend fun getItemsFor(ids: List<Long>): List<LineItem>
 
     @Insert
     suspend fun insert(receipt: Receipt): Long

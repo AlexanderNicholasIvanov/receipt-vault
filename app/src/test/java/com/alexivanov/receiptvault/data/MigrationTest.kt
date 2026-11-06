@@ -9,6 +9,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,6 +64,20 @@ class MigrationTest {
         assertMigrated()
     }
 
+    @Test
+    fun `v3 install keeps receipts and line items, none of them in the trash`() {
+        createAtVersion(3) { db ->
+            db.execSQL(
+                """INSERT INTO receipts (id, merchant, address, phone, category, purchasedAt, subtotalCents, taxCents,
+                   tipCents, discountCents, totalCents, currency, notes, imagePath, ocrText, createdAt, updatedAt)
+                   VALUES (7, 'Corner Cafe', '1 Main St', NULL, 'DINING', 1000, 2000, 160, 400, NULL, 2560, 'USD',
+                   'lunch', NULL, 'CORNER CAFE', 1, 2)""",
+            )
+            db.execSQL(LINE_ITEM)
+        }
+        assertMigrated()
+    }
+
     /** Opens the database with the current [AppDatabase], which runs the shipped migrations. */
     private fun assertMigrated() {
         val room = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, name).build()
@@ -74,6 +89,8 @@ class MigrationTest {
             assertEquals(400L, r.tipCents)
             assertEquals("1 Main St", r.address)
             assertEquals("lunch", r.notes)
+            assertNull("an upgraded receipt must not land in the trash", r.deletedAt)
+            assertEquals(listOf(7L), runBlocking { dao.getAll() }.map { it.id })
             // The receipts table is rebuilt; its line items must not be cascade-deleted along the way.
             assertEquals(listOf("Latte"), runBlocking { dao.getItems(7) }.map { it.name })
 

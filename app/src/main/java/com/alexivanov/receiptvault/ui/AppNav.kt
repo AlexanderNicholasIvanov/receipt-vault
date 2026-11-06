@@ -15,6 +15,7 @@ import com.alexivanov.receiptvault.ui.insights.InsightsScreen
 import com.alexivanov.receiptvault.ui.review.CaptureSource
 import com.alexivanov.receiptvault.ui.review.ReviewScreen
 import com.alexivanov.receiptvault.ui.settings.SettingsScreen
+import com.alexivanov.receiptvault.ui.trash.TrashScreen
 import kotlinx.coroutines.flow.Flow
 
 private object Routes {
@@ -23,6 +24,7 @@ private object Routes {
     const val DETAIL = "receipt/{id}"
     const val INSIGHTS = "insights"
     const val SETTINGS = "settings"
+    const val TRASH = "trash"
 
     fun review(uri: Uri? = null, source: CaptureSource = CaptureSource.MANUAL, id: Long? = null): String =
         "review?uri=${Uri.encode(uri?.toString().orEmpty())}&source=${source.name}&id=${id ?: ""}"
@@ -71,6 +73,7 @@ fun AppNav(sharedImages: Flow<Uri>, nav: NavHostController = rememberNavControll
             DetailScreen(id = id, onBack = { nav.popBackStack() }, onEdit = { nav.navigate(Routes.review(id = it)) })
         }
         composable(Routes.INSIGHTS) { InsightsScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }, onTrash = { nav.navigate(Routes.TRASH) }) }
+        composable(Routes.TRASH) { TrashScreen(onBack = { nav.popBackStack() }) }
     }
 }

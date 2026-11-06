@@ -92,7 +92,8 @@ class BackupManager(
                 manifestText ?: throw BackupException("This isn't a Receipt Vault backup (receipts.json is missing)."),
             )
 
-            val existing = receipts.getAll().mapTo(HashSet()) {
+            // Compare with the trash too: a trashed receipt is still on this phone.
+            val existing = receipts.getEverything().mapTo(HashSet()) {
                 BackupFormat.sameReceiptKey(it.merchant, it.purchasedAt, it.totalCents, it.currency)
             }
             var added = 0
