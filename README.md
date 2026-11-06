@@ -15,7 +15,7 @@ The home screen shows what you spent this month, last month, this year or all ti
 
 Turn on **App lock** in Settings to require your fingerprint, face or screen lock when the app opens or after you've been away for a minute. It also hides your receipts in the recent-apps view.
 
-Text recognition runs **on the phone** (ML Kit), so receipts and photos never leave the device. The app only goes online to check GitHub for updates, and it never asks for your location.
+Text recognition runs **on the phone** (ML Kit), so receipts and photos never leave the device. The app only goes online to check GitHub for updates and, if you turn on **Convert other currencies**, to download daily European Central Bank rates from frankfurter.dev (only your currency code is sent). It never asks for your location.
 
 ## Install on your phone
 
@@ -47,6 +47,7 @@ Updates install over the old version and keep your receipts. If the installed co
 - The **report** button on Home makes a PDF expense report of the receipts shown (or the ones selected): totals per currency and category, a line per receipt, and a page per photo. Share it straight to email or Drive.
 - Set a **return-by** or **warranty** date on a receipt (one tap for 14/30 days or 1/2 years). You get a notification 2 days before the return window closes and 30 days before the warranty ends.
 - **Settings → Monthly budgets**: a limit for everything and/or per category. Home shows what's left this month, and you get a notification at 80 % and when a budget is used up.
+- **Settings → Convert other currencies** (off by default): receipts in other currencies are added to totals, Insights and budgets at daily European Central Bank rates. Each receipt keeps its own currency; only the sums are converted. Rates are cached, so it keeps working offline.
 - **Long-press** a receipt to select several, then delete them, or use **⋮** to make an expense report, export them to CSV or download their photos.
 - Deleting asks nothing: you get an **Undo** button, and deleted receipts wait in **Settings → Trash** for 30 days before they're removed for good.
 

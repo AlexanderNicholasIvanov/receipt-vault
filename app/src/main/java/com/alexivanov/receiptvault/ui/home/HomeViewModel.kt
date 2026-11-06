@@ -6,6 +6,7 @@ import com.alexivanov.receiptvault.AppContainer
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.BudgetMath
+import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.CsvExport
@@ -86,14 +87,19 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
             tagsInUse = Tags.inUse(all.map { it.tags }),
             // Budgets are in the default currency, so only next to a total in that currency.
             budget = if (p == Period.THIS_MONTH && !f.hasDates && f.activeCount == 0 && needle.isEmpty() &&
-                Insights.primaryCurrency(filtered, settings.defaultCurrency) == settings.defaultCurrency
+                Insights.primaryCurrency(Conversion.toBase(filtered, settings.activeRates), settings.defaultCurrency) == settings.defaultCurrency
             ) {
-                BudgetMath.usage(settings.budgets.copy(byCategory = emptyMap()), all, settings.defaultCurrency, YearMonth.now()).firstOrNull()
+                BudgetMath.usage(
+                    settings.budgets.copy(byCategory = emptyMap()),
+                    Conversion.toBase(all, settings.activeRates),
+                    settings.defaultCurrency,
+                    YearMonth.now(),
+                ).firstOrNull()
             } else {
                 null
             },
             receipts = filtered,
-            summary = Insights.summarize(filtered, settings.defaultCurrency),
+            summary = Insights.summarize(filtered, settings.defaultCurrency, settings.activeRates),
             hasAny = all.isNotEmpty(),
             update = update,
             settings = settings,

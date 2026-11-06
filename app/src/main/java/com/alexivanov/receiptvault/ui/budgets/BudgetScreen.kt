@@ -44,6 +44,7 @@ import com.alexivanov.receiptvault.domain.BudgetMath
 import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Budgets
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.rememberNotificationPermissionRequest
@@ -76,7 +77,7 @@ fun BudgetScreen(onBack: () -> Unit) {
 
     val s = settings
     val currency = s?.defaultCurrency ?: "USD"
-    val uses = if (s == null) emptyList() else BudgetMath.usage(s.budgets, receipts, currency, YearMonth.now())
+    val uses = if (s == null) emptyList() else BudgetMath.usage(s.budgets, Conversion.toBase(receipts, s.activeRates), currency, YearMonth.now())
 
     Scaffold(
         topBar = {
@@ -101,7 +102,11 @@ fun BudgetScreen(onBack: () -> Unit) {
             item { SectionTitle("Monthly limits ($currency)") }
             item {
                 Text(
-                    "You'll get a notification at 80 % and when a budget is used up. Only receipts in $currency count.",
+                    if (s?.activeRates != null) {
+                        "You'll get a notification at 80 % and when a budget is used up. Receipts in other currencies count at today's exchange rates."
+                    } else {
+                        "You'll get a notification at 80 % and when a budget is used up. Only receipts in $currency count, unless you turn on currency conversion in Settings."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
