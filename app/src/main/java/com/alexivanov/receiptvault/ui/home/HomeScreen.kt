@@ -1,8 +1,23 @@
 package com.alexivanov.receiptvault.ui.home
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.alexivanov.receiptvault.ui.shareFile
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,6 +101,24 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var showSheet by remember { mutableStateOf(false) }
 
+    val selected by vm.selected.collectAsStateWithLifecycle()
+    val selecting = selected.isNotEmpty()
+    BackHandler(enabled = selecting) { vm.clearSelection() }
+
+    // "Moved to trash" with Undo, for deletes from here or from a receipt's screen.
+    LaunchedEffect(Unit) {
+        vm.pendingUndo.filterNotNull().collectLatest { ids ->
+            vm.undoOffered(ids)
+            val n = ids.size
+            val result = snackbar.showSnackbar(
+                if (n == 1) "Moved to trash" else "Moved $n receipts to trash",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) vm.undoTrash(ids)
+        }
+    }
+
     val capture = rememberCaptureActions(
         onCaptured = onCaptured,
         onError = { msg -> scope.launch { snackbar.showSnackbar(msg) } },
@@ -93,15 +126,45 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Receipts", fontWeight = FontWeight.SemiBold) },
-                actions = {
-                    IconButton(onClick = onInsights) {
-                        Icon(painterResource(R.drawable.ic_insights), contentDescription = "Insights")
-                    }
-                    IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
-                },
-            )
+            if (selecting) {
+                TopAppBar(
+                    title = { Text("${selected.size} selected") },
+                    navigationIcon = {
+                        IconButton(onClick = vm::clearSelection) { Icon(Icons.Default.Close, contentDescription = "Cancel selection") }
+                    },
+                    actions = {
+                        TextButton(onClick = vm::selectAll) { Text("All") }
+                        IconButton(onClick = {
+                            scope.launch { shareFile(context, vm.exportSelected(context.cacheDir), "text/csv", "Export receipts") }
+                        }) { Icon(Icons.Default.Share, contentDescription = "Export selected to CSV") }
+                        IconButton(onClick = {
+                            scope.launch {
+                                val n = vm.downloadSelectedPhotos()
+                                snackbar.showSnackbar(
+                                    when (n) {
+                                        0 -> "None of these receipts have a photo."
+                                        1 -> "Saved 1 photo to Pictures/Receipt Vault"
+                                        else -> "Saved $n photos to Pictures/Receipt Vault"
+                                    },
+                                )
+                            }
+                        }) { Icon(painterResource(R.drawable.ic_download), contentDescription = "Download photos") }
+                        IconButton(onClick = vm::trashSelected) {
+                            Icon(Icons.Default.Delete, contentDescription = "Move selected to trash")
+                        }
+                    },
+                )
+            } else {
+                TopAppBar(
+                    title = { Text("Receipts", fontWeight = FontWeight.SemiBold) },
+                    actions = {
+                        IconButton(onClick = onInsights) {
+                            Icon(painterResource(R.drawable.ic_insights), contentDescription = "Insights")
+                        }
+                        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
+                    },
+                )
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -142,7 +205,7 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = ui.query,
                         onValueChange = vm::setQuery,
-                        placeholder = { Text("Search merchant, item, note, place") },
+                        placeholder = { Text("Search merchant, item, note, address") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (ui.query.isNotEmpty()) {
@@ -166,7 +229,12 @@ fun HomeScreen(
                     )
                 }
                 else -> items(ui.receipts, key = { it.id }) { r ->
-                    ReceiptRow(r, onClick = { onOpen(r.id) })
+                    ReceiptRow(
+                        r,
+                        selected = r.id in selected,
+                        onClick = { if (selecting) vm.toggleSelected(r.id) else onOpen(r.id) },
+                        onLongClick = { vm.toggleSelected(r.id) },
+                    )
                     HorizontalDivider(Modifier.padding(start = 72.dp))
                 }
             }
@@ -248,15 +316,31 @@ private fun Stat(label: String, value: String) {
 }
 
 @Composable
-private fun ReceiptRow(r: Receipt, onClick: () -> Unit) {
+private fun ReceiptRow(r: Receipt, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val category = Category.fromName(r.category)
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "Select")
+            .semantics { this.selected = selected },
+        colors = if (selected) {
+            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        } else {
+            ListItemDefaults.colors()
+        },
         leadingContent = {
             Box(
-                Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                Modifier.size(40.dp).background(
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                    CircleShape,
+                ),
                 contentAlignment = Alignment.Center,
-            ) { Text(category.emoji) }
+            ) {
+                if (selected) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text(category.emoji)
+                }
+            }
         },
         headlineContent = { Text(r.merchant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {

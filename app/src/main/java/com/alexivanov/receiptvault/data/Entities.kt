@@ -28,6 +28,8 @@ data class Receipt(
     val ocrText: String = "",
     val createdAt: Long,
     val updatedAt: Long,
+    /** Set while the receipt is in the trash (epoch millis); null for normal receipts. */
+    val deletedAt: Long? = null,
 )
 
 @Entity(

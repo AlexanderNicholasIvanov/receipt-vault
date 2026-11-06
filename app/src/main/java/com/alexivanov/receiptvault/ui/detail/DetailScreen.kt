@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -78,7 +77,6 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
     val receipt by remember(id) { app.receipts.receipt(id) }.collectAsStateWithLifecycle(initialValue = null)
     val items by remember(id) { app.receipts.items(id) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
-    var confirmDelete by remember { mutableStateOf(false) }
     var showImage by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
@@ -95,7 +93,12 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                     if (r != null) {
                         IconButton(onClick = { share(context, r, items) }) { Icon(Icons.Default.Share, contentDescription = "Share") }
                         IconButton(onClick = { onEdit(r.id) }) { Icon(Icons.Default.Edit, contentDescription = "Edit") }
-                        IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, contentDescription = "Delete") }
+                        IconButton(onClick = {
+                            // Undo is offered on the home screen; the trash keeps it for 30 days.
+                            // App scope, so leaving this screen can't cancel the write.
+                            app.appScope.launch { app.receipts.moveToTrash(listOf(r.id)) }
+                            onBack()
+                        }) { Icon(Icons.Default.Delete, contentDescription = "Move to trash") }
                     }
                 },
             )
@@ -197,23 +200,6 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
 
         if (showImage && r.imagePath != null) ZoomableImageDialog(File(r.imagePath)) { showImage = false }
 
-        if (confirmDelete) {
-            AlertDialog(
-                onDismissRequest = { confirmDelete = false },
-                title = { Text("Delete receipt?") },
-                text = { Text("This removes the receipt and its photo from this phone.") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        confirmDelete = false
-                        scope.launch {
-                            app.receipts.delete(r)
-                            onBack()
-                        }
-                    }) { Text("Delete") }
-                },
-                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
-            )
-        }
     }
 }
 

@@ -48,6 +48,7 @@ import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.BackupException
 import com.alexivanov.receiptvault.domain.BackupFormat
 import com.alexivanov.receiptvault.domain.CsvExport
+import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -62,7 +63,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -70,6 +71,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     var currency by remember { mutableStateOf("") }
     val updateState by app.updates.state.collectAsStateWithLifecycle()
+    val trash by app.receipts.trash.collectAsStateWithLifecycle(initialValue = emptyList())
 
     LaunchedEffect(settings.defaultCurrency) { currency = settings.defaultCurrency }
 
@@ -211,6 +213,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                         shareFile(context, file, "text/csv", "Export receipts")
                     }
                 },
+            )
+            ListItem(
+                headlineContent = { Text("Trash") },
+                supportingContent = {
+                    Text(
+                        when (trash.size) {
+                            0 -> "Empty. Deleted receipts wait here for ${TrashPolicy.RETENTION_DAYS} days."
+                            1 -> "1 deleted receipt, kept for ${TrashPolicy.RETENTION_DAYS} days."
+                            else -> "${trash.size} deleted receipts, kept for ${TrashPolicy.RETENTION_DAYS} days."
+                        },
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onTrash),
             )
             ListItem(
                 headlineContent = { Text("Privacy") },

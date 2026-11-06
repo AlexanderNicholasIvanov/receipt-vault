@@ -47,6 +47,10 @@ class AppContainer(context: Context) {
         currentVersionCode = BuildConfig.VERSION_CODE,
     )
 
+    init {
+        appScope.launch { runCatching { receipts.purgeExpiredTrash() } }
+    }
+
     /** Launch-time check, unless the user turned it off in Settings. */
     fun checkForUpdatesOnLaunch() {
         appScope.launch { if (settings.current().autoCheckUpdates) updates.checkAutomatically() }

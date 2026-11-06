@@ -1,7 +1,10 @@
 package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.scan.ImageStore
+import com.alexivanov.receiptvault.domain.TrashPolicy
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 class ReceiptRepository(
     private val dao: ReceiptDao,
@@ -19,9 +22,50 @@ class ReceiptRepository(
 
     suspend fun save(receipt: Receipt, items: List<LineItem>): Long = dao.save(receipt, items)
 
-    suspend fun delete(receipt: Receipt) {
-        dao.delete(receipt)
-        images.delete(receipt.imagePath)
+    val trash: Flow<List<Receipt>> = dao.observeTrash()
+
+    /**
+     * The last batch moved to the trash, until the home screen has offered Undo
+     * for it. A state rather than an event: a delete on a receipt's own screen
+     * happens before Home is back on screen to hear about it.
+     */
+    private val _pendingUndo = MutableStateFlow<List<Long>?>(null)
+    val pendingUndo: StateFlow<List<Long>?> = _pendingUndo
+
+    /** Called once Home has shown the Undo prompt for [ids]. */
+    fun undoOffered(ids: List<Long>) {
+        _pendingUndo.compareAndSet(ids, null)
+    }
+
+    suspend fun getEverything(): List<Receipt> = dao.getEverything()
+    suspend fun getByIds(ids: List<Long>): List<Receipt> = dao.getByIds(ids)
+    suspend fun getItemsFor(ids: List<Long>): List<LineItem> = dao.getItemsFor(ids)
+
+    suspend fun moveToTrash(ids: List<Long>, now: Long = System.currentTimeMillis()) {
+        if (ids.isEmpty()) return
+        dao.setDeletedAt(ids, now)
+        _pendingUndo.value = ids
+    }
+
+    suspend fun restoreFromTrash(ids: List<Long>) {
+        if (ids.isNotEmpty()) dao.setDeletedAt(ids, null)
+    }
+
+    /** Deletes receipts and their photos for good. */
+    suspend fun deleteForever(receipts: List<Receipt>) {
+        for (r in receipts) {
+            dao.delete(r)
+            images.delete(r.imagePath)
+        }
+    }
+
+    suspend fun emptyTrash() = deleteForever(dao.getTrash())
+
+    /** Run at startup: the trash keeps receipts for [TrashPolicy.RETENTION_DAYS] days. */
+    suspend fun purgeExpiredTrash(now: Long = System.currentTimeMillis()): Int {
+        val expired = dao.getTrashedBefore(TrashPolicy.cutoff(now))
+        deleteForever(expired)
+        return expired.size
     }
 
     /** Drops a photo that was captured but never saved as a receipt. */

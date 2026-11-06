@@ -6,17 +6,23 @@ import com.alexivanov.receiptvault.AppContainer
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.CsvExport
+import com.alexivanov.receiptvault.domain.ImageNames
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.update.UpdateController
 import com.alexivanov.receiptvault.update.UpdateState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.LocalDate
 
 data class HomeUi(
@@ -47,6 +53,11 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
         }
     }
 
+    /** Receipts just moved to trash, from here or a receipt's screen, for the Undo snackbar. */
+    val pendingUndo: StateFlow<List<Long>?> = app.receipts.pendingUndo
+
+    fun undoOffered(ids: List<Long>) = app.receipts.undoOffered(ids)
+
     val ui: StateFlow<HomeUi> = combine(app.receipts.receipts, period, query, visibleUpdate, app.settings.settings) { all, p, q, update, settings ->
         val inPeriod = Insights.inPeriod(all, p, LocalDate.now())
         val needle = q.trim().lowercase()
@@ -65,6 +76,45 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
 
     init {
         app.checkForUpdatesOnLaunch()
+    }
+
+    // ------------------------------------------------------------------ selection
+
+    private val _selected = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** Receipts picked with a long-press; non-empty means the list is in selection mode. */
+    val selected: StateFlow<Set<Long>> = _selected
+
+    fun toggleSelected(id: Long) = _selected.update { if (id in it) it - id else it + id }
+    fun selectAll() = _selected.update { ui.value.receipts.mapTo(HashSet()) { it.id } }
+    fun clearSelection() { _selected.value = emptySet() }
+
+    fun trashSelected() {
+        val ids = _selected.value.toList()
+        clearSelection()
+        viewModelScope.launch { app.receipts.moveToTrash(ids) }
+    }
+
+    fun undoTrash(ids: List<Long>) {
+        viewModelScope.launch { app.receipts.restoreFromTrash(ids) }
+    }
+
+    /** CSV of just the selected receipts. */
+    suspend fun exportSelected(dir: File): File = withContext(Dispatchers.IO) {
+        val ids = _selected.value.toList()
+        val receipts = app.receipts.getByIds(ids).sortedByDescending { it.purchasedAt }
+        val csv = CsvExport.build(receipts, app.receipts.getItemsFor(ids))
+        File(dir, "exports").apply { mkdirs() }.resolve("receipts-selected-${LocalDate.now()}.csv").apply { writeText(csv) }
+    }
+
+    /** Saves the photos of the selected receipts to Pictures; returns how many were saved. */
+    suspend fun downloadSelectedPhotos(): Int {
+        var saved = 0
+        for (r in app.receipts.getByIds(_selected.value.toList())) {
+            val path = r.imagePath ?: continue
+            if (runCatching { app.images.saveToPictures(path, ImageNames.forReceipt(r.merchant, r.purchasedAt)) }.isSuccess) saved++
+        }
+        return saved
     }
 
     fun setPeriod(p: Period) { period.value = p }

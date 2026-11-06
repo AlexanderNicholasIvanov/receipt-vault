@@ -41,6 +41,8 @@ Updates install over the old version and keep your receipts. If the installed co
 - On a receipt, tap **Download image** under the photo to save it to your phone. It goes to *Pictures/Receipt Vault*, which shows up as an album in Gallery and in My Files.
 - You can also **Share** a photo from Gallery to *Receipt Vault*.
 - Tap a receipt to see the photo (pinch to zoom), the breakdown, store address and items. You can edit, share or delete it from there.
+- **Long-press** a receipt to select several, then export them to CSV, download their photos or delete them together.
+- Deleting asks nothing: you get an **Undo** button, and deleted receipts wait in **Settings → Trash** for 30 days before they're removed for good.
 
 ## Development
 

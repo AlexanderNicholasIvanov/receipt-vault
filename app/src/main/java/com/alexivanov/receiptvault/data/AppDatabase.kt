@@ -14,11 +14,13 @@ import androidx.room.migration.AutoMigrationSpec
  */
 @Database(
     entities = [Receipt::class, LineItem::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.DropPaymentMethod::class),
         AutoMigration(from = 2, to = 3, spec = AppDatabase.DropScanLocation::class),
+        // v4: receipts.deletedAt (trash). Adding a nullable column needs no spec.
+        AutoMigration(from = 3, to = 4),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
