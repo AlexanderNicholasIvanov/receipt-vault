@@ -10,6 +10,7 @@ import com.alexivanov.receiptvault.domain.CsvExport
 import com.alexivanov.receiptvault.domain.ImageNames
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.Period
+import com.alexivanov.receiptvault.domain.ReceiptFilter
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.update.UpdateController
 import com.alexivanov.receiptvault.update.UpdateState
@@ -29,6 +30,7 @@ data class HomeUi(
     val loading: Boolean = true,
     val period: Period = Period.THIS_MONTH,
     val query: String = "",
+    val filter: ReceiptFilter = ReceiptFilter(),
     val receipts: List<Receipt> = emptyList(),
     val summary: Summary? = null,
     val hasAny: Boolean = false,
@@ -40,6 +42,8 @@ data class HomeUi(
 class HomeViewModel(private val app: AppContainer) : ViewModel() {
     private val period = MutableStateFlow(Period.THIS_MONTH)
     private val query = MutableStateFlow("")
+    private val filter = MutableStateFlow(ReceiptFilter())
+    private val listOptions = combine(period, query, filter) { p, q, f -> Triple(p, q, f) }
 
     val updates: UpdateController = app.updates
 
@@ -58,14 +62,17 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
 
     fun undoOffered(ids: List<Long>) = app.receipts.undoOffered(ids)
 
-    val ui: StateFlow<HomeUi> = combine(app.receipts.receipts, period, query, visibleUpdate, app.settings.settings) { all, p, q, update, settings ->
-        val inPeriod = Insights.inPeriod(all, p, LocalDate.now())
+    val ui: StateFlow<HomeUi> = combine(app.receipts.receipts, listOptions, visibleUpdate, app.settings.settings) { all, (p, q, f), update, settings ->
+        // A custom date range replaces the period chips.
+        val inPeriod = if (f.hasDates) all else Insights.inPeriod(all, p, LocalDate.now())
         val needle = q.trim().lowercase()
-        val filtered = if (needle.isEmpty()) inPeriod else inPeriod.filter { r -> matches(r, needle) }
+        val searched = if (needle.isEmpty()) inPeriod else inPeriod.filter { r -> matches(r, needle) }
+        val filtered = f.apply(searched)
         HomeUi(
             loading = false,
             period = p,
             query = q,
+            filter = f,
             receipts = filtered,
             summary = Insights.summarize(filtered, settings.defaultCurrency),
             hasAny = all.isNotEmpty(),
@@ -117,7 +124,12 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
         return saved
     }
 
-    fun setPeriod(p: Period) { period.value = p }
+    fun setPeriod(p: Period) {
+        period.value = p
+        filter.update { it.copy(from = null, to = null) }
+    }
+
+    fun setFilter(f: ReceiptFilter) { filter.value = f }
     fun setQuery(q: String) { query.value = q }
 
     fun dismissUpdate(versionCode: Int) {
