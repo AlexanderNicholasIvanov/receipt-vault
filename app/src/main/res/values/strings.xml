@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Receipt Vault</string>
+    <string name="shortcut_scan_short">Scan receipt</string>
+    <string name="shortcut_scan_long">Scan a receipt</string>
+    <string name="shortcut_manual_short">Add manually</string>
+    <string name="shortcut_manual_long">Add a receipt by hand</string>
+    <string name="tile_scan">Scan receipt</string>
+    <string name="widget_description">Scan a receipt or add one by hand, straight from the home screen.</string>
 </resources>

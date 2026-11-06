@@ -62,33 +62,39 @@ fun rememberCaptureActions(
     }
 
     fun launchCamera() {
-        val uri = newCameraUri(context)
-        pendingCameraUri = uri.toString()
         try {
+            val uri = newCameraUri(context)
+            pendingCameraUri = uri.toString()
             cameraLauncher.launch(uri)
         } catch (_: Exception) {
+            pendingCameraUri = null
             onError("No camera app is available.")
         }
     }
 
     fun launchScanner() {
         if (activity == null) return launchCamera()
+        fun fallBack() {
+            // Scanner module unavailable (no Play services, still downloading): use the camera app.
+            onError("Document scanner unavailable, opening the camera instead.")
+            launchCamera()
+        }
         // Created on demand: the client needs Google Play services, which only the scanner path uses.
-        val scanner = GmsDocumentScanning.getClient(
-            GmsDocumentScannerOptions.Builder()
-                .setGalleryImportAllowed(false)
-                .setPageLimit(PdfPages.MAX_PAGES)
-                .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-                .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
-                .build(),
-        )
-        scanner.getStartScanIntent(activity)
+        val start = try {
+            GmsDocumentScanning.getClient(
+                GmsDocumentScannerOptions.Builder()
+                    .setGalleryImportAllowed(false)
+                    .setPageLimit(PdfPages.MAX_PAGES)
+                    .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+                    .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+                    .build(),
+            ).getStartScanIntent(activity)
+        } catch (_: Exception) {
+            return fallBack()
+        }
+        start
             .addOnSuccessListener { sender -> scanLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
-            .addOnFailureListener {
-                // Scanner module unavailable (no Play services, still downloading): use the camera app.
-                onError("Document scanner unavailable, opening the camera instead.")
-                launchCamera()
-            }
+            .addOnFailureListener { fallBack() }
     }
 
     return CaptureActions(

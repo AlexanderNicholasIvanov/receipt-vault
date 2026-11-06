@@ -39,6 +39,8 @@ Updates install over the old version and keep your receipts. If the installed co
   - **Choose from gallery**: imports an existing photo or screenshot.
   - **Import a PDF**: an emailed invoice or saved order. Up to 10 pages are read; password-protected PDFs can't be opened.
   - **Enter manually**: no photo, just the numbers.
+- Faster ways in: long-press the app icon for **Scan receipt** / **Add manually**, add the **Scan receipt** tile to Quick Settings, or put the **Receipt Vault** widget (Scan and Add buttons, no amounts shown) on the home screen.
+- If a new receipt has the same total, day and merchant as one you already saved, the app asks before saving a second copy.
 - On a receipt, tap **Download image** under the photo to save it to your phone. It goes to *Pictures/Receipt Vault*, which shows up as an album in Gallery and in My Files.
 - You can also **Share** a photo (or several photos of one long receipt) or a PDF to *Receipt Vault*, or open a PDF with it from My Files or an email app.
 - Tap a receipt to see the photo (pinch to zoom), the breakdown, store address and items. You can edit, share or delete it from there.

@@ -76,6 +76,7 @@ import com.alexivanov.receiptvault.ui.appViewModel
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import java.io.File
+import java.time.ZoneId
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneOffset
@@ -390,6 +391,22 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
 
     if (showImage && s.imagePath != null) {
         ZoomableImageDialog(File(s.imagePath)) { showImage = false }
+    }
+
+    s.duplicateOf?.let { twin ->
+        val day = Instant.ofEpochMilli(twin.purchasedAt).atZone(ZoneId.systemDefault()).toLocalDate()
+        AlertDialog(
+            onDismissRequest = vm::dismissDuplicate,
+            title = { Text("Already saved?") },
+            text = {
+                Text(
+                    "You already have a receipt from ${twin.merchant} for ${money(twin.totalCents, twin.currency)} on " +
+                        "${day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))}. Save this one as well?",
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.save(allowDuplicate = true) }) { Text("Save anyway") } },
+            dismissButton = { TextButton(onClick = vm::dismissDuplicate) { Text("Keep editing") } },
+        )
     }
 }
 

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
+import com.alexivanov.receiptvault.capture.QuickAction
 import com.alexivanov.receiptvault.domain.AppLockPolicy
 import com.alexivanov.receiptvault.scan.PdfPages
 import com.alexivanov.receiptvault.ui.AppNav
@@ -31,6 +32,9 @@ class MainActivity : ComponentActivity() {
 
     /** Photos or a PDF shared into the app ("Share > Receipt Vault"), or a PDF opened with it. */
     private val shared = Channel<List<Uri>>(Channel.BUFFERED)
+
+    /** App shortcut, Quick Settings tile or widget taps. */
+    private val quickActions = Channel<QuickAction>(Channel.CONFLATED)
 
     /** Receipts to open, from tapping a reminder notification. */
     private val openReceipts = Channel<Long>(Channel.CONFLATED)
@@ -65,7 +69,11 @@ class MainActivity : ComponentActivity() {
                     // Stays composed while locked so results from the camera or a file picker
                     // still arrive; it's hidden from the screen and from accessibility services.
                     Box(if (locked) Modifier.fillMaxSize().clearAndSetSemantics { } else Modifier.fillMaxSize()) {
-                        AppNav(sharedImages = shared.receiveAsFlow(), openReceipts = openReceipts.receiveAsFlow())
+                        AppNav(
+                            sharedImages = shared.receiveAsFlow(),
+                            openReceipts = openReceipts.receiveAsFlow(),
+                            quickActions = quickActions.receiveAsFlow(),
+                        )
                     }
                     if (locked) {
                         LockScreen(onUnlocked = {
@@ -104,6 +112,7 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent?.getLongExtra(EXTRA_RECEIPT_ID, -1L)?.takeIf { it > 0 }?.let { openReceipts.trySend(it) }
         sharedUris(intent).takeIf { it.isNotEmpty() }?.let { shared.trySend(it) }
+        QuickAction.from(intent)?.let { quickActions.trySend(it) }
     }
 
     companion object {

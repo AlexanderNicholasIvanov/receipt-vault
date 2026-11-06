@@ -1,6 +1,7 @@
 package com.alexivanov.receiptvault
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -179,6 +180,34 @@ class AppSmokeTest {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("left of", substring = true), 10_000)
         compose.onNodeWithText("$5.00 left of $30.00 budget").assertExists()
+    }
+
+    @Test
+    fun `saving the same receipt twice asks first`() {
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        addManualReceipt("Corner Cafe", "25.60")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
+
+        compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+        compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+        compose.onNodeWithText("Merchant").performTextInput("corner cafe")
+        compose.onNodeWithText("Total").performTextInput("25.60")
+        compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
+
+        compose.waitUntilAtLeastOneExists(hasText("Already saved?"), 5_000)
+        compose.onNodeWithText("You already have a receipt from Corner Cafe for $25.60", substring = true).assertExists()
+        compose.onNodeWithText("Keep editing").performClick()
+        compose.waitUntilDoesNotExist(hasText("Already saved?"), 5_000)
+
+        compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Save anyway"), 5_000)
+        compose.onNodeWithText("Save anyway").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Edit"), 10_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("$51.20"), 10_000)
     }
 
     @Test

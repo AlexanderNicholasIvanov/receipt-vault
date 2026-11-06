@@ -3,12 +3,14 @@ package com.alexivanov.receiptvault.ui
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.alexivanov.receiptvault.capture.QuickAction
 import com.alexivanov.receiptvault.domain.PageUris
 import com.alexivanov.receiptvault.ui.budgets.BudgetScreen
 import com.alexivanov.receiptvault.ui.detail.DetailScreen
@@ -18,7 +20,9 @@ import com.alexivanov.receiptvault.ui.review.CaptureSource
 import com.alexivanov.receiptvault.ui.review.ReviewScreen
 import com.alexivanov.receiptvault.ui.settings.SettingsScreen
 import com.alexivanov.receiptvault.ui.trash.TrashScreen
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.emptyFlow
 
 private object Routes {
@@ -40,7 +44,24 @@ private object Routes {
  * @param sharedImages photos or a PDF shared into the app; several photos are pages of one receipt.
  */
 @Composable
-fun AppNav(sharedImages: Flow<List<Uri>>, openReceipts: Flow<Long> = emptyFlow(), nav: NavHostController = rememberNavController()) {
+fun AppNav(
+    sharedImages: Flow<List<Uri>>,
+    openReceipts: Flow<Long> = emptyFlow(),
+    quickActions: Flow<QuickAction> = emptyFlow(),
+    nav: NavHostController = rememberNavController(),
+) {
+    // Scans are launched by Home, which owns the scanner; it takes each request exactly once.
+    val scanRequests = remember { Channel<Unit>(Channel.CONFLATED) }
+    val scanRequestFlow = remember { scanRequests.receiveAsFlow() }
+    LaunchedEffect(quickActions) {
+        quickActions.collect { action ->
+            nav.popBackStack(Routes.HOME, inclusive = false)
+            when (action) {
+                QuickAction.SCAN -> scanRequests.trySend(Unit)
+                QuickAction.MANUAL -> nav.navigate(Routes.review())
+            }
+        }
+    }
     LaunchedEffect(sharedImages) {
         sharedImages.collect { uris -> nav.navigate(Routes.review(uris, CaptureSource.SHARED)) }
     }
@@ -56,6 +77,7 @@ fun AppNav(sharedImages: Flow<List<Uri>>, openReceipts: Flow<Long> = emptyFlow()
                 onManual = { nav.navigate(Routes.review()) },
                 onInsights = { nav.navigate(Routes.INSIGHTS) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
+                scanRequests = scanRequestFlow,
             )
         }
         composable(
