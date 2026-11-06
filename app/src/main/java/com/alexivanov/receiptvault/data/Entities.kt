@@ -1,0 +1,58 @@
+package com.alexivanov.receiptvault.data
+
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "receipts", indices = [Index("purchasedAt")])
+data class Receipt(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val merchant: String,
+    val address: String? = null,
+    val phone: String? = null,
+    /** [com.alexivanov.receiptvault.domain.Category] name. */
+    val category: String,
+    /** When the purchase happened (epoch millis), from the receipt when readable. */
+    val purchasedAt: Long,
+    val subtotalCents: Long? = null,
+    val taxCents: Long? = null,
+    val tipCents: Long? = null,
+    val discountCents: Long? = null,
+    val totalCents: Long,
+    val currency: String,
+    val paymentMethod: String? = null,
+    val cardLast4: String? = null,
+    /** Where the receipt was scanned (device location), when the user allowed it. */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationLabel: String? = null,
+    val notes: String = "",
+    /** Absolute path of the stored photo inside app-private storage. */
+    val imagePath: String? = null,
+    /** Raw OCR text, kept for search and re-parsing. */
+    val ocrText: String = "",
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Entity(
+    tableName = "line_items",
+    foreignKeys = [
+        ForeignKey(
+            entity = Receipt::class,
+            parentColumns = ["id"],
+            childColumns = ["receiptId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("receiptId")],
+)
+data class LineItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val receiptId: Long,
+    val position: Int,
+    val name: String,
+    val quantity: Int = 1,
+    val priceCents: Long,
+)
