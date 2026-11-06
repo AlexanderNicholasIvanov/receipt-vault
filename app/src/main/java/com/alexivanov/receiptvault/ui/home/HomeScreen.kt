@@ -82,13 +82,11 @@ fun HomeScreen(
     val vm = appViewModel { app, _ -> HomeViewModel(app) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val app = (context.applicationContext as com.alexivanov.receiptvault.ReceiptVaultApp).container
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showSheet by remember { mutableStateOf(false) }
 
     val capture = rememberCaptureActions(
-        askForLocation = ui.settings.tagLocation && !app.location.hasPermission(),
         onCaptured = onCaptured,
         onError = { msg -> scope.launch { snackbar.showSnackbar(msg) } },
     )

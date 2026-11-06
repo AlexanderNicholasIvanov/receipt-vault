@@ -13,7 +13,6 @@ import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.ParsedReceipt
 import com.alexivanov.receiptvault.domain.ReceiptParser
-import com.alexivanov.receiptvault.scan.Place
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -23,7 +22,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** How the photo was obtained. Only live captures get the phone's current location. */
+/** How the photo was obtained. */
 enum class CaptureSource { SCAN, CAMERA, GALLERY, SHARED, MANUAL }
 
 data class ItemDraft(val key: Long, val name: String, val quantity: String, val price: String)
@@ -41,9 +40,6 @@ data class ReceiptDraft(
     val currency: String = "USD",
     val address: String = "",
     val phone: String = "",
-    val locationLabel: String = "",
-    val latitude: Double? = null,
-    val longitude: Double? = null,
     val notes: String = "",
     val items: List<ItemDraft> = emptyList(),
 ) {
@@ -85,9 +81,6 @@ class ReviewViewModel(
 
     private val receiptId: Long = handle.get<String>("id")?.toLongOrNull() ?: 0L
     private val imageUri: String? = handle.get<String>("uri")?.takeIf { it.isNotBlank() }
-    private val source: CaptureSource = handle.get<String>("source")?.let { s ->
-        CaptureSource.entries.firstOrNull { it.name == s }
-    } ?: CaptureSource.MANUAL
 
     private val _state = MutableStateFlow<ReviewState>(ReviewState.Working("Starting…"))
     val state: StateFlow<ReviewState> = _state
@@ -136,9 +129,6 @@ class ReviewViewModel(
                 currency = r.currency,
                 address = r.address.orEmpty(),
                 phone = r.phone.orEmpty(),
-                locationLabel = r.locationLabel.orEmpty(),
-                latitude = r.latitude,
-                longitude = r.longitude,
                 notes = r.notes,
                 items = items,
             ),
@@ -155,18 +145,18 @@ class ReviewViewModel(
     private suspend fun processPhoto(uri: Uri) {
         val settings = app.settings.current()
         _state.value = ReviewState.Working("Saving photo…")
-        val stored = try {
+        val photo = try {
             app.images.import(uri)
         } catch (e: Exception) {
             _state.value = ReviewState.Failed("Could not open that photo: ${e.message ?: "unknown error"}")
             return
         }
-        imagePath = stored.file.absolutePath
+        imagePath = photo.absolutePath
 
         _state.value = ReviewState.Working("Reading receipt…")
         var notice: String? = null
         val parsed = try {
-            val rows = LineAssembler.assemble(app.textReader.read(stored.file))
+            val rows = LineAssembler.assemble(app.textReader.read(photo))
             ocrText = rows.joinToString("\n") { it.text }
             if (rows.isEmpty()) notice = "No text found. Fill in the details by hand, or retake the photo in better light."
             ReceiptParser.parse(rows, LocalDate.now(), settings.dayFirstDates)
@@ -175,26 +165,17 @@ class ReviewViewModel(
             ParsedReceipt()
         }
 
-        _state.value = ReviewState.Working("Finding location…")
-        val live = source == CaptureSource.SCAN || source == CaptureSource.CAMERA
-        val place: Place? = when {
-            live && settings.tagLocation -> app.location.currentPlace()
-            stored.exifLatitude != null && stored.exifLongitude != null ->
-                Place(stored.exifLatitude, stored.exifLongitude, app.location.reverseGeocode(stored.exifLatitude, stored.exifLongitude))
-            else -> null
-        } ?: parsed.address?.let { app.location.geocode(it) }
-
         if (notice == null && parsed.totalCents == null) notice = "Couldn't find the total. Please check the amounts."
 
         _state.value = ReviewState.Editing(
-            draft = parsed.toDraft(settings.defaultCurrency, place),
+            draft = parsed.toDraft(settings.defaultCurrency),
             isNew = true,
             imagePath = imagePath,
             notice = notice,
         )
     }
 
-    private fun ParsedReceipt.toDraft(defaultCurrency: String, place: Place?) = ReceiptDraft(
+    private fun ParsedReceipt.toDraft(defaultCurrency: String) = ReceiptDraft(
         merchant = merchant.orEmpty(),
         category = category,
         date = date ?: LocalDate.now(),
@@ -207,9 +188,6 @@ class ReviewViewModel(
         currency = currencyCode ?: defaultCurrency,
         address = address.orEmpty(),
         phone = phone.orEmpty(),
-        locationLabel = place?.label.orEmpty(),
-        latitude = place?.latitude,
-        longitude = place?.longitude,
         items = items.map { ItemDraft(nextKey++, it.name, it.quantity.toString(), Money.toPlain(it.priceCents)) },
     )
 
@@ -220,19 +198,6 @@ class ReviewViewModel(
     }
 
     fun addItem() = edit { it.copy(items = it.items + ItemDraft(nextKey++, "", "1", "")) }
-
-    fun clearLocation() = edit { it.copy(locationLabel = "", latitude = null, longitude = null) }
-
-    fun useCurrentLocation() {
-        viewModelScope.launch {
-            val place = app.location.currentPlace()
-            if (place == null) {
-                _state.update { s -> if (s is ReviewState.Editing) s.copy(notice = "Location unavailable. Check that location is on and allowed.") else s }
-            } else {
-                edit { it.copy(locationLabel = place.label ?: "%.5f, %.5f".format(place.latitude, place.longitude), latitude = place.latitude, longitude = place.longitude) }
-            }
-        }
-    }
 
     fun dismissNotice() = _state.update { s -> if (s is ReviewState.Editing) s.copy(notice = null) else s }
 
@@ -264,9 +229,6 @@ class ReviewViewModel(
             discountCents = Money.parseUserInput(d.discount)?.let { kotlin.math.abs(it) },
             totalCents = total,
             currency = currency,
-            latitude = d.latitude,
-            longitude = d.longitude,
-            locationLabel = d.locationLabel.trim().ifBlank { null },
             notes = d.notes.trim(),
             imagePath = imagePath,
             ocrText = ocrText,

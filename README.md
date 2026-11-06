@@ -6,14 +6,14 @@ An Android app for Samsung Galaxy phones on **One UI 8 (Android 16)** and newer 
 - **When**: purchase date and time
 - **Amounts**: subtotal, discount, tax, tip (with tip %), total, currency
 - **Line items**: name, quantity and price
-- **Where**: the place you scanned it (optional GPS plus a street address), with *Open in Maps*
+- **Where**: the store address printed on the receipt, with *Open in Maps*
 - **Category**: dining, groceries, fuel and others, guessed automatically
 
 You review and correct everything before saving. A warning appears if subtotal − discount + tax + tip doesn't add up to the total.
 
 The home screen shows what you spent this month, last month, this year or all time, with tips and tax totals and a search box. **Insights** adds a monthly spending chart, a category breakdown, top merchants and your average tip. **Settings** can export everything to CSV for Excel or Google Sheets.
 
-Text recognition runs **on the phone** (ML Kit), so receipts and photos never leave the device. The app only goes online to check GitHub for updates and to look up addresses on the map.
+Text recognition runs **on the phone** (ML Kit), so receipts and photos never leave the device. The app only goes online to check GitHub for updates, and it never asks for your location.
 
 ## Install on your phone
 
@@ -37,7 +37,7 @@ Updates install over the old version and keep your receipts. If the installed co
   - **Choose from gallery**: imports an existing photo or screenshot.
   - **Enter manually**: no photo, just the numbers.
 - You can also **Share** a photo from Gallery to *Receipt Vault*.
-- Tap a receipt to see the photo (pinch to zoom), the breakdown, location and items. You can edit, share or delete it from there.
+- Tap a receipt to see the photo (pinch to zoom), the breakdown, store address and items. You can edit, share or delete it from there.
 
 ## Development
 
@@ -53,7 +53,7 @@ Layout:
 | Path | What |
 |---|---|
 | `app/src/main/java/.../domain/` | Pure Kotlin, unit tested. `ReceiptParser` (OCR text → amounts, date, merchant…), `LineAssembler` (joins label/price columns), `Money`, `Insights`, `CsvExport` |
-| `.../scan/` | ML Kit OCR, photo storage, location and geocoding |
+| `.../scan/` | ML Kit OCR and photo storage |
 | `.../data/` | Room database (`receipts`, `line_items`) and DataStore settings |
 | `.../ui/` | Jetpack Compose screens: home, review/edit, detail, insights, settings |
 | `.../update/` | GitHub Releases check, in-app APK download + verification, installer hand-off |

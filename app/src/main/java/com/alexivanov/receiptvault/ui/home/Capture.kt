@@ -1,6 +1,5 @@
 package com.alexivanov.receiptvault.ui.home
 
-import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
@@ -13,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.core.net.toUri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -24,7 +22,7 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.File
 
-/** The three ways to get a receipt photo, plus the optional location prompt in front of live captures. */
+/** The three ways to get a receipt photo. */
 class CaptureActions(
     val scan: () -> Unit,
     val camera: () -> Unit,
@@ -33,14 +31,12 @@ class CaptureActions(
 
 @Composable
 fun rememberCaptureActions(
-    askForLocation: Boolean,
     onCaptured: (Uri, CaptureSource) -> Unit,
     onError: (String) -> Unit,
 ): CaptureActions {
     val context = LocalContext.current
     val activity = LocalActivity.current
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -57,12 +53,6 @@ fun rememberCaptureActions(
 
     val pickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onCaptured(uri, CaptureSource.GALLERY)
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        // Granted or not, carry on with the capture the user asked for.
-        pendingAction?.invoke()
-        pendingAction = null
     }
 
     fun launchCamera() {
@@ -95,18 +85,9 @@ fun rememberCaptureActions(
             }
     }
 
-    fun withLocationPrompt(action: () -> Unit) {
-        if (askForLocation) {
-            pendingAction = action
-            permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-        } else {
-            action()
-        }
-    }
-
     return CaptureActions(
-        scan = { withLocationPrompt(::launchScanner) },
-        camera = { withLocationPrompt(::launchCamera) },
+        scan = ::launchScanner,
+        camera = ::launchCamera,
         gallery = {
             pickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },

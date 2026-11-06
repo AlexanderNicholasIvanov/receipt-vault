@@ -3,9 +3,6 @@
 
     <!-- Update check and download from GitHub Releases. OCR runs fully on-device. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Optional: tag where a receipt was scanned. The app works if denied. -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- In-app updates: hand a downloaded, verified release APK to the system
          installer. The user still confirms every install. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -14,9 +11,6 @@
          or the system camera app, neither of which needs it. -->
     <uses-feature
         android:name="android.hardware.camera"
-        android:required="false" />
-    <uses-feature
-        android:name="android.hardware.location"
         android:required="false" />
 
     <application

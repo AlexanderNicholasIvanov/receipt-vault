@@ -14,10 +14,11 @@ import androidx.room.migration.AutoMigrationSpec
  */
 @Database(
     entities = [Receipt::class, LineItem::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.DropPaymentMethod::class),
+        AutoMigration(from = 2, to = 3, spec = AppDatabase.DropScanLocation::class),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,6 +30,14 @@ abstract class AppDatabase : RoomDatabase() {
         DeleteColumn(tableName = "receipts", columnName = "cardLast4"),
     )
     class DropPaymentMethod : AutoMigrationSpec
+
+    /** v3: the app no longer records where the phone was when a receipt was scanned. */
+    @DeleteColumn.Entries(
+        DeleteColumn(tableName = "receipts", columnName = "latitude"),
+        DeleteColumn(tableName = "receipts", columnName = "longitude"),
+        DeleteColumn(tableName = "receipts", columnName = "locationLabel"),
+    )
+    class DropScanLocation : AutoMigrationSpec
 
     companion object {
         const val NAME = "receipts.db"

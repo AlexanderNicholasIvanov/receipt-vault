@@ -11,27 +11,21 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
-/** A copied receipt photo plus any GPS position the original carried in EXIF. */
-data class StoredImage(val file: File, val exifLatitude: Double?, val exifLongitude: Double?)
-
 /**
  * Copies receipt photos into app-private storage, upright and downscaled so
- * hundreds of receipts do not eat the phone's storage.
+ * hundreds of receipts do not eat the phone's storage. The copy is re-encoded
+ * without EXIF, so no GPS position or camera metadata from the original is kept.
  */
 class ImageStore(private val context: Context) {
 
     private val dir: File get() = File(context.filesDir, "receipts").apply { mkdirs() }
 
-    suspend fun import(uri: Uri): StoredImage = withContext(Dispatchers.IO) {
+    suspend fun import(uri: Uri): File = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
-        var lat: Double? = null
-        var lng: Double? = null
         var rotation = 0
         runCatching {
             resolver.openInputStream(uri)?.use { input ->
-                val exif = ExifInterface(input)
-                exif.latLong?.let { lat = it[0]; lng = it[1] }
-                rotation = exif.rotationDegrees
+                rotation = ExifInterface(input).rotationDegrees
             }
         }
 
@@ -56,7 +50,7 @@ class ImageStore(private val context: Context) {
         val out = File(dir, "${UUID.randomUUID()}.jpg")
         out.outputStream().use { upright.compress(Bitmap.CompressFormat.JPEG, 88, it) }
         upright.recycle()
-        StoredImage(out, lat, lng)
+        out
     }
 
     fun delete(path: String?) {
