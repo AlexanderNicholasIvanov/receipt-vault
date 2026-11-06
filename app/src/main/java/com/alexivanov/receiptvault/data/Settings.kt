@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.alexivanov.receiptvault.domain.Budgets
 import com.alexivanov.receiptvault.domain.Money
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -27,6 +29,8 @@ data class AppSettings(
     val appLock: Boolean = false,
     /** When the last backup was saved (epoch millis), or 0 if never. */
     val lastBackupAt: Long = 0,
+    /** Monthly spending limits in [defaultCurrency]. */
+    val budgets: Budgets = Budgets(),
 )
 
 class SettingsRepository(private val context: Context) {
@@ -36,6 +40,8 @@ class SettingsRepository(private val context: Context) {
     private val autoCheck = booleanPreferencesKey("auto_check_updates")
     private val appLockKey = booleanPreferencesKey("app_lock")
     private val lastBackup = longPreferencesKey("last_backup_at")
+    private val budgetsKey = stringPreferencesKey("budgets")
+    private val sentAlerts = stringSetPreferencesKey("sent_alerts")
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
         val defaults = AppSettings()
@@ -46,6 +52,7 @@ class SettingsRepository(private val context: Context) {
             autoCheckUpdates = p[autoCheck] ?: defaults.autoCheckUpdates,
             appLock = p[appLockKey] ?: false,
             lastBackupAt = p[lastBackup] ?: 0,
+            budgets = Budgets.decode(p[budgetsKey]),
         )
     }
 
@@ -57,4 +64,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutoCheckUpdates(value: Boolean) = context.dataStore.edit { it[autoCheck] = value }
     suspend fun setAppLock(value: Boolean) = context.dataStore.edit { it[appLockKey] = value }
     suspend fun setLastBackupAt(value: Long) = context.dataStore.edit { it[lastBackup] = value }
+    suspend fun setBudgets(value: Budgets) = context.dataStore.edit { it[budgetsKey] = value.encode() }
+
+    /** Keys of reminder and budget notifications already shown, so each one is sent once. */
+    suspend fun sentAlerts(): Set<String> = context.dataStore.data.first()[sentAlerts].orEmpty()
+
+    suspend fun setSentAlerts(keys: Set<String>) = context.dataStore.edit { it[sentAlerts] = keys }
 }

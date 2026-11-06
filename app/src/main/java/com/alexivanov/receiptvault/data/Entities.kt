@@ -34,6 +34,10 @@ data class Receipt(
     /** Comma-separated labels; see [com.alexivanov.receiptvault.domain.Tags]. */
     @ColumnInfo(defaultValue = "")
     val tags: String = "",
+    /** Last day to return it to the store (epoch day), for a reminder. */
+    val returnBy: Long? = null,
+    /** Last day of the warranty (epoch day), for a reminder. */
+    val warrantyUntil: Long? = null,
 )
 
 @Entity(

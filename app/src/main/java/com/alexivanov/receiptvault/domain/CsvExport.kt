@@ -3,6 +3,7 @@ package com.alexivanov.receiptvault.domain
 import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -11,7 +12,7 @@ object CsvExport {
 
     private val HEADER = listOf(
         "id", "date", "time", "merchant", "category", "subtotal", "tax", "tip", "discount", "total", "currency",
-        "receipt_address", "notes", "items", "tags",
+        "receipt_address", "notes", "items", "tags", "return_by", "warranty_until",
     )
 
     fun build(receipts: List<Receipt>, items: List<LineItem>, zone: ZoneId = ZoneId.systemDefault()): String {
@@ -40,6 +41,8 @@ object CsvExport {
                 r.notes,
                 itemCell,
                 Tags.decode(r.tags).joinToString(", "),
+                r.returnBy?.let { LocalDate.ofEpochDay(it).toString() }.orEmpty(),
+                r.warrantyUntil?.let { LocalDate.ofEpochDay(it).toString() }.orEmpty(),
             )
             sb.append(row.joinToString(",") { escape(it) }).append("\r\n")
         }

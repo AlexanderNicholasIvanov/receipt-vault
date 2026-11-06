@@ -98,6 +98,24 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun `v5 install keeps receipts and tags, with no reminders yet`() {
+        createAtVersion(5) { db ->
+            db.execSQL(
+                """INSERT INTO receipts (id, merchant, address, phone, category, purchasedAt, subtotalCents, taxCents,
+                   tipCents, discountCents, totalCents, currency, notes, imagePath, ocrText, createdAt, updatedAt, deletedAt, tags)
+                   VALUES (7, 'Corner Cafe', '1 Main St', NULL, 'DINING', 1000, 2000, 160, 400, NULL, 2560, 'USD',
+                   'lunch', NULL, 'CORNER CAFE', 1, 2, NULL, '')""",
+            )
+            db.execSQL(LINE_ITEM)
+        }
+        assertMigrated { dao ->
+            val r = runBlocking { dao.get(7) }!!
+            assertNull(r.returnBy)
+            assertNull(r.warrantyUntil)
+        }
+    }
+
     /** Opens the database with the current [AppDatabase], which runs the shipped migrations. */
     private fun assertMigrated(extra: (ReceiptDao) -> Unit = {}) {
         val room = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, name).build()

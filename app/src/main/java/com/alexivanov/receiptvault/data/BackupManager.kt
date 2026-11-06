@@ -45,6 +45,7 @@ class BackupManager(
                 purchasedAt = r.purchasedAt, subtotalCents = r.subtotalCents, taxCents = r.taxCents,
                 tipCents = r.tipCents, discountCents = r.discountCents, totalCents = r.totalCents,
                 currency = r.currency, notes = r.notes, ocrText = r.ocrText, tags = Tags.decode(r.tags),
+                returnBy = r.returnBy, warrantyUntil = r.warrantyUntil,
                 createdAt = r.createdAt, updatedAt = r.updatedAt, photo = photo,
                 items = itemsByReceipt[r.id].orEmpty().sortedBy { it.position }
                     .map { BackupItem(it.name, it.quantity, it.priceCents) },
@@ -112,7 +113,7 @@ class BackupManager(
                     purchasedAt = b.purchasedAt, subtotalCents = b.subtotalCents, taxCents = b.taxCents,
                     tipCents = b.tipCents, discountCents = b.discountCents, totalCents = b.totalCents,
                     currency = b.currency, notes = b.notes, imagePath = imagePath, ocrText = b.ocrText,
-                    tags = Tags.encode(b.tags),
+                    tags = Tags.encode(b.tags), returnBy = b.returnBy, warrantyUntil = b.warrantyUntil,
                     createdAt = b.createdAt.takeIf { it > 0 } ?: now, updatedAt = b.updatedAt.takeIf { it > 0 } ?: now,
                 )
                 val items = b.items.map { LineItem(receiptId = 0, position = 0, name = it.name, quantity = it.quantity, priceCents = it.priceCents) }

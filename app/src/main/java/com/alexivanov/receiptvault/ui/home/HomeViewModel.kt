@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.alexivanov.receiptvault.AppContainer
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.data.Receipt
+import com.alexivanov.receiptvault.domain.BudgetMath
+import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.CsvExport
 import com.alexivanov.receiptvault.domain.ExpenseReport
@@ -28,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
+import java.time.YearMonth
 
 data class HomeUi(
     val loading: Boolean = true,
@@ -36,6 +39,8 @@ data class HomeUi(
     val filter: ReceiptFilter = ReceiptFilter(),
     /** Every tag on a receipt, most used first, for the filter sheet. */
     val tagsInUse: List<String> = emptyList(),
+    /** This month's overall budget, shown on the summary card when the list is this month, unfiltered. */
+    val budget: BudgetUse? = null,
     val receipts: List<Receipt> = emptyList(),
     val summary: Summary? = null,
     val hasAny: Boolean = false,
@@ -79,6 +84,14 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
             query = q,
             filter = f,
             tagsInUse = Tags.inUse(all.map { it.tags }),
+            // Budgets are in the default currency, so only next to a total in that currency.
+            budget = if (p == Period.THIS_MONTH && !f.hasDates && f.activeCount == 0 && needle.isEmpty() &&
+                Insights.primaryCurrency(filtered, settings.defaultCurrency) == settings.defaultCurrency
+            ) {
+                BudgetMath.usage(settings.budgets.copy(byCategory = emptyMap()), all, settings.defaultCurrency, YearMonth.now()).firstOrNull()
+            } else {
+                null
+            },
             receipts = filtered,
             summary = Insights.summarize(filtered, settings.defaultCurrency),
             hasAny = all.isNotEmpty(),

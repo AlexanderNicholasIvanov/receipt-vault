@@ -44,6 +44,8 @@ Updates install over the old version and keep your receipts. If the installed co
 - Tap **Filters** above the list to sort (newest, oldest, highest, lowest, merchant A–Z) and narrow it by category, total and a custom date range. The summary card totals whatever is shown.
 - Add **tags** ("work, Berlin trip") when saving a receipt. Search finds them, and **Filters** can show only receipts with a tag.
 - The **report** button on Home makes a PDF expense report of the receipts shown (or the ones selected): totals per currency and category, a line per receipt, and a page per photo. Share it straight to email or Drive.
+- Set a **return-by** or **warranty** date on a receipt (one tap for 14/30 days or 1/2 years). You get a notification 2 days before the return window closes and 30 days before the warranty ends.
+- **Settings → Monthly budgets**: a limit for everything and/or per category. Home shows what's left this month, and you get a notification at 80 % and when a budget is used up.
 - **Long-press** a receipt to select several, then delete them, or use **⋮** to make an expense report, export them to CSV or download their photos.
 - Deleting asks nothing: you get an **Undo** button, and deleted receipts wait in **Settings → Trash** for 30 days before they're removed for good.
 

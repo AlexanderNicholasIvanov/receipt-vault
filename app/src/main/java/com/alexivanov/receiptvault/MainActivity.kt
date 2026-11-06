@@ -31,6 +31,9 @@ class MainActivity : ComponentActivity() {
     /** Images shared into the app ("Share > Receipt Vault" from Gallery). */
     private val shared = Channel<Uri>(Channel.BUFFERED)
 
+    /** Receipts to open, from tapping a reminder notification. */
+    private val openReceipts = Channel<Long>(Channel.CONFLATED)
+
     private var lockEnabled = false
     private var locked by mutableStateOf(false)
 
@@ -54,14 +57,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (savedInstanceState == null) handleShare(intent)
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             ReceiptVaultTheme {
                 Box(Modifier.fillMaxSize()) {
                     // Stays composed while locked so results from the camera or a file picker
                     // still arrive; it's hidden from the screen and from accessibility services.
                     Box(if (locked) Modifier.fillMaxSize().clearAndSetSemantics { } else Modifier.fillMaxSize()) {
-                        AppNav(sharedImages = shared.receiveAsFlow())
+                        AppNav(sharedImages = shared.receiveAsFlow(), openReceipts = openReceipts.receiveAsFlow())
                     }
                     if (locked) {
                         LockScreen(onUnlocked = {
@@ -94,12 +97,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleShare(intent)
+        handleIntent(intent)
     }
 
-    private fun handleShare(intent: Intent?) {
+    private fun handleIntent(intent: Intent?) {
+        intent?.getLongExtra(EXTRA_RECEIPT_ID, -1L)?.takeIf { it > 0 }?.let { openReceipts.trySend(it) }
         if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("image/") != true) return
         IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let { shared.trySend(it) }
+    }
+
+    companion object {
+        const val EXTRA_RECEIPT_ID = "receipt_id"
     }
 
 }

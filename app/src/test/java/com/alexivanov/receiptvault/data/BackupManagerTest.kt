@@ -45,7 +45,7 @@ class BackupManagerTest {
     private fun receipt(merchant: String, total: Long, photo: File? = null) = Receipt(
         merchant = merchant, category = "DINING", purchasedAt = 1_700_000_000_000 + total, totalCents = total,
         tipCents = 300, currency = "USD", notes = "note $merchant", imagePath = photo?.absolutePath,
-        ocrText = "OCR $merchant", createdAt = 5, updatedAt = 6, tags = "work,$merchant",
+        ocrText = "OCR $merchant", createdAt = 5, updatedAt = 6, tags = "work,$merchant", returnBy = 20_400, warrantyUntil = 21_000,
     )
 
     @Test
@@ -69,6 +69,8 @@ class BackupManagerTest {
         assertEquals("note Corner Cafe", cafe.notes)
         assertEquals("OCR Corner Cafe", cafe.ocrText)
         assertEquals("work,Corner Cafe", cafe.tags)
+        assertEquals(20_400L, cafe.returnBy)
+        assertEquals(21_000L, cafe.warrantyUntil)
         assertEquals(5L, cafe.createdAt)
         assertEquals(listOf("Latte" to 2), newPhone.getItems(cafe.id).map { it.name to it.quantity })
         // The photo is a new file in app storage with the same bytes.

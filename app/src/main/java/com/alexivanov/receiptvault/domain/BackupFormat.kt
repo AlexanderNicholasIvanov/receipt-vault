@@ -37,6 +37,9 @@ data class BackupReceipt(
     val ocrText: String = "",
     /** Added after format 1 shipped; older backups simply have none. */
     val tags: List<String> = emptyList(),
+    /** Epoch days; also added after format 1. */
+    val returnBy: Long? = null,
+    val warrantyUntil: Long? = null,
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
     /** Zip entry holding the photo, e.g. "photos/12.jpg". */
