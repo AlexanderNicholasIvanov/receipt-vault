@@ -41,8 +41,6 @@ class ReceiptParserTest {
         assertNull(r.tipCents)
         assertEquals(LocalDate.of(2026, 11, 2), r.date)
         assertEquals(LocalTime.of(17, 41), r.time)
-        assertEquals("Visa", r.paymentMethod)
-        assertEquals("4821", r.cardLast4)
         assertEquals(Category.GROCERIES, r.category)
         assertEquals(listOf("Bananas", "Organic Milk", "Greek Yogurt"), r.items.map { it.name })
         assertEquals(798L, r.items.last().priceCents)
@@ -80,8 +78,6 @@ class ReceiptParserTest {
         assertEquals(4052L, r.totalCents)
         assertEquals(LocalDate.of(2026, 10, 30), r.date)
         assertEquals(LocalTime.of(19, 12), r.time)
-        assertEquals("Mastercard", r.paymentMethod)
-        assertEquals("1111", r.cardLast4)
         assertEquals(Category.DINING, r.category)
         assertEquals(3, r.items.size)
     }
@@ -133,7 +129,6 @@ class ReceiptParserTest {
         assertEquals(3669L, r.totalCents)
         assertEquals(Category.FUEL, r.category)
         assertEquals(LocalDate.of(2026, 11, 5), r.date)
-        assertEquals("Debit", r.paymentMethod)
     }
 
     @Test
@@ -175,7 +170,6 @@ class ReceiptParserTest {
 
         assertEquals(1080L, r.totalCents)
         assertEquals(200L, r.discountCents)
-        assertEquals("Cash", r.paymentMethod)
         assertEquals(Category.SHOPPING, r.category)
     }
 

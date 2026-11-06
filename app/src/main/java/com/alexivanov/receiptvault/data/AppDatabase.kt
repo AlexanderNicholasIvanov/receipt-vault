@@ -1,16 +1,39 @@
 package com.alexivanov.receiptvault.data
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
+import androidx.room.DeleteColumn
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.AutoMigrationSpec
 
-@Database(entities = [Receipt::class, LineItem::class], version = 1, exportSchema = true)
+/**
+ * Receipts live only on the phone, so every schema change ships a migration
+ * that keeps them. Never use a destructive fallback.
+ */
+@Database(
+    entities = [Receipt::class, LineItem::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2, spec = AppDatabase.DropPaymentMethod::class),
+    ],
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun receiptDao(): ReceiptDao
 
+    /** v2: the app no longer records how a receipt was paid. */
+    @DeleteColumn.Entries(
+        DeleteColumn(tableName = "receipts", columnName = "paymentMethod"),
+        DeleteColumn(tableName = "receipts", columnName = "cardLast4"),
+    )
+    class DropPaymentMethod : AutoMigrationSpec
+
     companion object {
+        const val NAME = "receipts.db"
+
         fun create(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "receipts.db").build()
+            Room.databaseBuilder(context, AppDatabase::class.java, NAME).build()
     }
 }

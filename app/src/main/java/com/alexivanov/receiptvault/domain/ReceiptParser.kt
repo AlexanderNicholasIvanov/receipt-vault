@@ -18,8 +18,6 @@ data class ParsedReceipt(
     val discountCents: Long? = null,
     val totalCents: Long? = null,
     val currencyCode: String? = null,
-    val paymentMethod: String? = null,
-    val cardLast4: String? = null,
     val items: List<ParsedItem> = emptyList(),
     val category: Category = Category.OTHER,
 )
@@ -58,7 +56,6 @@ object ReceiptParser {
         val merchant = findMerchant(classified)
         val (subtotal, tax, tip, discount, total) = findAmounts(classified)
         val (date, time) = findDateTime(normalized.map { it.text }, today, preferDayFirst)
-        val (payment, last4) = findPayment(fullText)
 
         return ParsedReceipt(
             merchant = merchant,
@@ -72,8 +69,6 @@ object ReceiptParser {
             discountCents = discount,
             totalCents = total,
             currencyCode = findCurrency(fullText),
-            paymentMethod = payment,
-            cardLast4 = last4,
             items = findItems(classified),
             category = Category.guess(merchant, fullText),
         )
@@ -310,21 +305,7 @@ object ReceiptParser {
         return date to time
     }
 
-    // ---------------------------------------------------------------- payment / currency
-
-    private val CARD_BRANDS = listOf(
-        "american express" to "Amex", "amex" to "Amex", "visa" to "Visa", "mastercard" to "Mastercard",
-        "master card" to "Mastercard", "discover" to "Discover", "apple pay" to "Apple Pay",
-        "google pay" to "Google Pay", "samsung pay" to "Samsung Pay", "debit" to "Debit", "cash" to "Cash",
-    )
-    private val LAST4 = Regex("""(?:[*xX#•]{2,}[\s-]*)+(\d{4})(?!\d)|ending\s+(?:in\s+)?(\d{4})(?!\d)|acct(?:ount)?\s*#?\s*:?\s*\D{0,8}(\d{4})(?!\d)""", RegexOption.IGNORE_CASE)
-
-    private fun findPayment(text: String): Pair<String?, String?> {
-        val lower = text.lowercase()
-        val method = CARD_BRANDS.firstOrNull { (key, _) -> Regex("""\b${Regex.escape(key)}\b""").containsMatchIn(lower) }?.second
-        val last4 = LAST4.find(text)?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() }
-        return (method ?: if (last4 != null) "Card" else null) to last4
-    }
+    // ---------------------------------------------------------------- currency
 
     private fun findCurrency(text: String): String? = when {
         text.contains('€') || Regex("""\bEUR\b""").containsMatchIn(text) -> "EUR"

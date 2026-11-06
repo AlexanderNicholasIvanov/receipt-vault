@@ -5,7 +5,6 @@ An Android app for Samsung Galaxy phones on **One UI 8 (Android 16)** and newer 
 - **Store**: merchant name, address and phone
 - **When**: purchase date and time
 - **Amounts**: subtotal, discount, tax, tip (with tip %), total, currency
-- **Payment**: card brand and last 4 digits, or cash
 - **Line items**: name, quantity and price
 - **Where**: the place you scanned it (optional GPS plus a street address), with *Open in Maps*
 - **Category**: dining, groceries, fuel and others, guessed automatically

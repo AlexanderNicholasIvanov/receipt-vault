@@ -248,21 +248,6 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
             }
         }
 
-        item { SectionTitle("Payment") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = d.paymentMethod, onValueChange = { v -> vm.edit { it.copy(paymentMethod = v) } },
-                    label = { Text("Method") }, placeholder = { Text("Visa, Cash…") }, singleLine = true, modifier = Modifier.weight(2f),
-                )
-                OutlinedTextField(
-                    value = d.cardLast4, onValueChange = { v -> vm.edit { it.copy(cardLast4 = v.filter(Char::isDigit).take(4)) } },
-                    label = { Text("Last 4") }, singleLine = true, modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-            }
-        }
-
         item { SectionTitle("Location") }
         item {
             OutlinedTextField(
