@@ -11,9 +11,11 @@ import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
+import com.alexivanov.receiptvault.domain.PageUris
 import com.alexivanov.receiptvault.domain.ParsedReceipt
 import com.alexivanov.receiptvault.domain.ReceiptParser
 import com.alexivanov.receiptvault.domain.Tags
+import com.alexivanov.receiptvault.scan.PdfPages
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,13 +23,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
 /** How the photo was obtained. */
-enum class CaptureSource { SCAN, CAMERA, GALLERY, SHARED, MANUAL }
+enum class CaptureSource { SCAN, CAMERA, GALLERY, SHARED, PDF, MANUAL }
 
 data class ItemDraft(val key: Long, val name: String, val quantity: String, val price: String)
 
@@ -88,7 +91,8 @@ class ReviewViewModel(
 ) : ViewModel() {
 
     private val receiptId: Long = handle.get<String>("id")?.toLongOrNull() ?: 0L
-    private val imageUri: String? = handle.get<String>("uri")?.takeIf { it.isNotBlank() }
+    /** One photo, several scanned pages, or a PDF. */
+    private val imageUris: List<String> = PageUris.decode(handle.get<String>("uri"))
 
     private val _state = MutableStateFlow<ReviewState>(ReviewState.Working("Starting…"))
     val state: StateFlow<ReviewState> = _state
@@ -107,7 +111,7 @@ class ReviewViewModel(
         viewModelScope.launch {
             when {
                 receiptId != 0L -> loadExisting()
-                imageUri != null -> processPhoto(imageUri.toUri())
+                imageUris.isNotEmpty() -> processPhoto(imageUris.map { it.toUri() })
                 else -> startManual()
             }
         }
@@ -153,21 +157,42 @@ class ReviewViewModel(
         _state.value = ReviewState.Editing(ReceiptDraft(currency = settings.defaultCurrency), isNew = true, imagePath = null)
     }
 
-    private suspend fun processPhoto(uri: Uri) {
+    private suspend fun processPhoto(uris: List<Uri>) {
         val settings = app.settings.current()
         _state.value = ReviewState.Working("Saving photo…")
-        val photo = try {
-            app.images.import(uri)
+        // Every page is imported (upright, downscaled) and read on its own, then the pages are stacked into one photo.
+        val pages = mutableListOf<File>()
+        var fromPdf = false
+        try {
+            for (uri in uris) {
+                if (pages.size >= PdfPages.MAX_PAGES) break
+                if (PdfPages.isPdf(app.context, uri)) {
+                    fromPdf = true
+                    _state.value = ReviewState.Working("Opening PDF…")
+                    val rendered = app.pdfPages.render(uri, PdfPages.MAX_PAGES - pages.size)
+                    try {
+                        rendered.forEach { pages += app.images.import(Uri.fromFile(it)) }
+                    } finally {
+                        rendered.forEach { it.delete() }
+                    }
+                } else {
+                    pages += app.images.import(uri)
+                }
+            }
+            require(pages.isNotEmpty()) { "Nothing to import." }
         } catch (e: Exception) {
-            _state.value = ReviewState.Failed("Could not open that photo: ${e.message ?: "unknown error"}")
+            pages.forEach { app.images.delete(it.absolutePath) }
+            val what = if (fromPdf) "PDF" else "photo"
+            _state.value = ReviewState.Failed("Could not open that $what: ${e.message ?: "unknown error"}")
             return
         }
-        imagePath = photo.absolutePath
 
-        _state.value = ReviewState.Working("Reading receipt…")
         var notice: String? = null
         val parsed = try {
-            val rows = LineAssembler.assemble(app.textReader.read(photo))
+            val rows = pages.flatMapIndexed { i, page ->
+                _state.value = ReviewState.Working(if (pages.size == 1) "Reading receipt…" else "Reading page ${i + 1} of ${pages.size}…")
+                LineAssembler.assemble(app.textReader.read(page))
+            }
             ocrText = rows.joinToString("\n") { it.text }
             if (rows.isEmpty()) notice = "No text found. Fill in the details by hand, or retake the photo in better light."
             ReceiptParser.parse(rows, LocalDate.now(), settings.dayFirstDates)
@@ -178,12 +203,37 @@ class ReviewViewModel(
 
         if (notice == null && parsed.totalCents == null) notice = "Couldn't find the total. Please check the amounts."
 
+        imagePath = if (pages.size == 1) {
+            pages.single().absolutePath
+        } else {
+            _state.value = ReviewState.Working("Joining ${pages.size} pages…")
+            joinPages(pages) { notice = notice ?: it }
+        }
+
         _state.value = ReviewState.Editing(
             draft = parsed.toDraft(settings.defaultCurrency),
             isNew = true,
             imagePath = imagePath,
             notice = notice,
         )
+    }
+
+    /** Stacks the pages into one photo; if that fails (very long scans on a small phone), keeps the first page. */
+    private suspend fun joinPages(pages: List<File>, warn: (String) -> Unit): String {
+        val joined = try {
+            app.images.stitch(pages)
+        } catch (e: Exception) {
+            null
+        } catch (e: OutOfMemoryError) {
+            null
+        }
+        if (joined != null) {
+            pages.forEach { app.images.delete(it.absolutePath) }
+            return joined.absolutePath
+        }
+        warn("Couldn't join the pages, so only the first one is kept as the photo. The text of every page was read.")
+        pages.drop(1).forEach { app.images.delete(it.absolutePath) }
+        return pages.first().absolutePath
     }
 
     private fun ParsedReceipt.toDraft(defaultCurrency: String) = ReceiptDraft(

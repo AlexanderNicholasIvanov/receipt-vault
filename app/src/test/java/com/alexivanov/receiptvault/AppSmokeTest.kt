@@ -36,6 +36,7 @@ class AppSmokeTest {
 
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+        compose.onNodeWithText("Import a PDF", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
 
         compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)

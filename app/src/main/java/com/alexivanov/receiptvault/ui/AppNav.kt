@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.alexivanov.receiptvault.domain.PageUris
 import com.alexivanov.receiptvault.ui.budgets.BudgetScreen
 import com.alexivanov.receiptvault.ui.detail.DetailScreen
 import com.alexivanov.receiptvault.ui.home.HomeScreen
@@ -29,19 +30,19 @@ private object Routes {
     const val TRASH = "trash"
     const val BUDGETS = "budgets"
 
-    fun review(uri: Uri? = null, source: CaptureSource = CaptureSource.MANUAL, id: Long? = null): String =
-        "review?uri=${Uri.encode(uri?.toString().orEmpty())}&source=${source.name}&id=${id ?: ""}"
+    fun review(uris: List<Uri> = emptyList(), source: CaptureSource = CaptureSource.MANUAL, id: Long? = null): String =
+        "review?uri=${Uri.encode(PageUris.encode(uris.map(Uri::toString)))}&source=${source.name}&id=${id ?: ""}"
 
     fun detail(id: Long) = "receipt/$id"
 }
 
 /**
- * @param sharedImages photos shared into the app from Gallery or elsewhere.
+ * @param sharedImages photos or a PDF shared into the app; several photos are pages of one receipt.
  */
 @Composable
-fun AppNav(sharedImages: Flow<Uri>, openReceipts: Flow<Long> = emptyFlow(), nav: NavHostController = rememberNavController()) {
+fun AppNav(sharedImages: Flow<List<Uri>>, openReceipts: Flow<Long> = emptyFlow(), nav: NavHostController = rememberNavController()) {
     LaunchedEffect(sharedImages) {
-        sharedImages.collect { uri -> nav.navigate(Routes.review(uri, CaptureSource.SHARED)) }
+        sharedImages.collect { uris -> nav.navigate(Routes.review(uris, CaptureSource.SHARED)) }
     }
     LaunchedEffect(openReceipts) {
         openReceipts.collect { id -> nav.navigate(Routes.detail(id)) { launchSingleTop = true } }
@@ -51,7 +52,7 @@ fun AppNav(sharedImages: Flow<Uri>, openReceipts: Flow<Long> = emptyFlow(), nav:
         composable(Routes.HOME) {
             HomeScreen(
                 onOpen = { nav.navigate(Routes.detail(it)) },
-                onCaptured = { uri, source -> nav.navigate(Routes.review(uri, source)) },
+                onCaptured = { uris, source -> nav.navigate(Routes.review(uris, source)) },
                 onManual = { nav.navigate(Routes.review()) },
                 onInsights = { nav.navigate(Routes.INSIGHTS) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },

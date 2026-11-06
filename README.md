@@ -34,12 +34,13 @@ Updates install over the old version and keep your receipts. If the installed co
 ## Using it
 
 - Tap **Add receipt** and choose one of these:
-  - **Scan receipt**: Google's document scanner auto-crops and flattens the paper. Gives the best OCR results.
+  - **Scan receipt**: Google's document scanner auto-crops and flattens the paper. Gives the best OCR results. A long receipt can be scanned as several pages (up to 10); every page is read and the pages are joined into one photo.
   - **Take a photo**: uses the regular camera app.
   - **Choose from gallery**: imports an existing photo or screenshot.
+  - **Import a PDF**: an emailed invoice or saved order. Up to 10 pages are read; password-protected PDFs can't be opened.
   - **Enter manually**: no photo, just the numbers.
 - On a receipt, tap **Download image** under the photo to save it to your phone. It goes to *Pictures/Receipt Vault*, which shows up as an album in Gallery and in My Files.
-- You can also **Share** a photo from Gallery to *Receipt Vault*.
+- You can also **Share** a photo (or several photos of one long receipt) or a PDF to *Receipt Vault*, or open a PDF with it from My Files or an email app.
 - Tap a receipt to see the photo (pinch to zoom), the breakdown, store address and items. You can edit, share or delete it from there.
 - Tap **Filters** above the list to sort (newest, oldest, highest, lowest, merchant A–Z) and narrow it by category, total and a custom date range. The summary card totals whatever is shown.
 - Add **tags** ("work, Berlin trip") when saving a receipt. Search finds them, and **Filters** can show only receipts with a tag.

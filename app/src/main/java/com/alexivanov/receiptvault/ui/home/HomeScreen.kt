@@ -97,7 +97,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onOpen: (Long) -> Unit,
-    onCaptured: (Uri, CaptureSource) -> Unit,
+    onCaptured: (List<Uri>, CaptureSource) -> Unit,
     onManual: () -> Unit,
     onInsights: () -> Unit,
     onSettings: () -> Unit,
@@ -328,7 +328,7 @@ fun HomeScreen(
         ModalBottomSheet(onDismissRequest = { showSheet = false }) {
             Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
                 Text("Add a receipt", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-                SheetOption(painterResource(R.drawable.ic_camera), "Scan receipt", "Auto-crops and flattens the paper. Best results.") {
+                SheetOption(painterResource(R.drawable.ic_camera), "Scan receipt", "Auto-crops and flattens the paper. Long receipts can be scanned in several pages.") {
                     showSheet = false; capture.scan()
                 }
                 SheetOption(painterResource(R.drawable.ic_camera), "Take a photo", "Use the regular camera app.") {
@@ -336,6 +336,9 @@ fun HomeScreen(
                 }
                 SheetOption(painterResource(R.drawable.ic_photo), "Choose from gallery", "Import a receipt photo or screenshot.") {
                     showSheet = false; capture.gallery()
+                }
+                SheetOption(painterResource(R.drawable.ic_report), "Import a PDF", "An emailed invoice or a saved order confirmation.") {
+                    showSheet = false; capture.pdf()
                 }
                 ListItem(
                     headlineContent = { Text("Enter manually") },

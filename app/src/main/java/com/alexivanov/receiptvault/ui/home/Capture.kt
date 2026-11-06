@@ -16,22 +16,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
+import com.alexivanov.receiptvault.scan.PdfPages
 import com.alexivanov.receiptvault.ui.review.CaptureSource
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.File
 
-/** The three ways to get a receipt photo. */
+/** The ways to get a receipt in: scanner (one or more pages), camera, gallery, or a PDF. */
 class CaptureActions(
     val scan: () -> Unit,
     val camera: () -> Unit,
     val gallery: () -> Unit,
+    val pdf: () -> Unit,
 )
 
 @Composable
 fun rememberCaptureActions(
-    onCaptured: (Uri, CaptureSource) -> Unit,
+    onCaptured: (List<Uri>, CaptureSource) -> Unit,
     onError: (String) -> Unit,
 ): CaptureActions {
     val context = LocalContext.current
@@ -40,19 +42,23 @@ fun rememberCaptureActions(
 
     val scanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            val page = GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pages?.firstOrNull()
-            if (page != null) onCaptured(page.imageUri, CaptureSource.SCAN) else onError("The scanner returned no page.")
+            val pages = GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pages.orEmpty()
+            if (pages.isNotEmpty()) onCaptured(pages.map { it.imageUri }, CaptureSource.SCAN) else onError("The scanner returned no page.")
         }
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val uri = pendingCameraUri
-        if (ok && uri != null) onCaptured(uri.toUri(), CaptureSource.CAMERA)
+        if (ok && uri != null) onCaptured(listOf(uri.toUri()), CaptureSource.CAMERA)
         pendingCameraUri = null
     }
 
     val pickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) onCaptured(uri, CaptureSource.GALLERY)
+        if (uri != null) onCaptured(listOf(uri), CaptureSource.GALLERY)
+    }
+
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onCaptured(listOf(uri), CaptureSource.PDF)
     }
 
     fun launchCamera() {
@@ -71,7 +77,7 @@ fun rememberCaptureActions(
         val scanner = GmsDocumentScanning.getClient(
             GmsDocumentScannerOptions.Builder()
                 .setGalleryImportAllowed(false)
-                .setPageLimit(1)
+                .setPageLimit(PdfPages.MAX_PAGES)
                 .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
                 .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
                 .build(),
@@ -90,6 +96,13 @@ fun rememberCaptureActions(
         camera = ::launchCamera,
         gallery = {
             pickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+        pdf = {
+            try {
+                pdfLauncher.launch(arrayOf("application/pdf"))
+            } catch (_: Exception) {
+                onError("No file picker is available.")
+            }
         },
     )
 }
