@@ -13,6 +13,8 @@ You review and correct everything before saving. A warning appears if subtotal â
 
 The home screen shows what you spent this month, last month, this year or all time, with tips and tax totals and a search box. **Insights** adds a monthly spending chart, a category breakdown, top merchants and your average tip. **Settings** can export everything to CSV for Excel or Google Sheets, and save a full **backup** (receipts, items and photos in one `.zip`) to Google Drive, a USB drive or any folder, then **restore** it on a new phone.
 
+Turn on **App lock** in Settings to require your fingerprint, face or screen lock when the app opens or after you've been away for a minute. It also hides your receipts in the recent-apps view.
+
 Text recognition runs **on the phone** (ML Kit), so receipts and photos never leave the device. The app only goes online to check GitHub for updates, and it never asks for your location.
 
 ## Install on your phone

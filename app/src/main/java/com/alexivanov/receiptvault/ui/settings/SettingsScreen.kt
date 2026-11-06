@@ -49,6 +49,7 @@ import com.alexivanov.receiptvault.domain.BackupException
 import com.alexivanov.receiptvault.domain.BackupFormat
 import com.alexivanov.receiptvault.domain.CsvExport
 import com.alexivanov.receiptvault.domain.TrashPolicy
+import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import com.alexivanov.receiptvault.ui.shareFile
@@ -144,6 +145,36 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit) {
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            HorizontalDivider()
+
+            Column(Modifier.padding(horizontal = 16.dp)) { SectionTitle("Security") }
+            ListItem(
+                headlineContent = { Text("App lock") },
+                supportingContent = {
+                    Text(
+                        "Ask for your fingerprint, face or screen lock when opening Receipt Vault, and after you've been away " +
+                            "for a minute. Also hides receipts in the recent-apps view.",
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = settings.appLock,
+                        onCheckedChange = { on ->
+                            val reason = Authenticator.unavailableReason(context)
+                            if (reason != null) {
+                                scope.launch { snackbar.showSnackbar(reason) }
+                            } else {
+                                // Confirm it's really the owner before turning the lock on or off.
+                                Authenticator.authenticate(context, if (on) "Turn on app lock" else "Turn off app lock") { ok, msg ->
+                                    scope.launch {
+                                        if (ok) app.settings.setAppLock(on) else msg?.let { snackbar.showSnackbar(it) }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                },
             )
             HorizontalDivider()
 

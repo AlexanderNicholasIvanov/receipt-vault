@@ -117,6 +117,7 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Export to CSV"), 5_000)
         compose.onNodeWithText("Day-first dates").assertExists()
+        compose.onNodeWithText("App lock").assertExists()
         compose.onNodeWithText("Save scan location").assertDoesNotExist()
         compose.onNodeWithText("Back up receipts", useUnmergedTree = true).performScrollTo().assertExists()
         compose.onNodeWithText("Restore from backup", useUnmergedTree = true).assertExists()
