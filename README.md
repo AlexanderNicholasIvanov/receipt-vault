@@ -37,9 +37,9 @@ Updates install over the old version and keep your receipts. If the installed co
   - **Take a photo**: uses the regular camera app.
   - **Choose from gallery**: imports an existing photo or screenshot.
   - **Enter manually**: no photo, just the numbers.
+- On a receipt, tap **Download image** under the photo to save it to your phone. It goes to *Pictures/Receipt Vault*, which shows up as an album in Gallery and in My Files.
 - You can also **Share** a photo from Gallery to *Receipt Vault*.
 - Tap a receipt to see the photo (pinch to zoom), the breakdown, location and items. You can edit, share or delete it from there.
-- Tap **Download image** under the photo to save it to your phone. It goes to *Pictures/Receipt Vault*, which shows up as an album in Gallery and in My Files.
 
 ## Development
 
