@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drawn by the launcher through RemoteViews, so plain framework attributes only (no AppCompat). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="UseCompatTextViewDrawableXml"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/widget_scan"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_button"
+        android:drawableStart="@drawable/ic_widget_camera"
+        android:drawablePadding="8dp"
+        android:gravity="center"
+        android:minHeight="48dp"
+        android:paddingHorizontal="12dp"
+        android:text="@string/shortcut_scan_short"
+        android:textColor="@color/widget_button_text"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/widget_manual"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_button"
+        android:drawableStart="@drawable/ic_widget_edit"
+        android:drawablePadding="8dp"
+        android:gravity="center"
+        android:minHeight="48dp"
+        android:paddingHorizontal="12dp"
+        android:text="@string/shortcut_manual_short"
+        android:textColor="@color/widget_button_text"
+        android:textSize="14sp" />
+</LinearLayout>

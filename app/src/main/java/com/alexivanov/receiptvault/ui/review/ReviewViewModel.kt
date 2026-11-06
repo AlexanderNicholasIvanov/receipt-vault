@@ -9,6 +9,7 @@ import com.alexivanov.receiptvault.AppContainer
 import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.Duplicates
 import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.PageUris
@@ -81,6 +82,8 @@ sealed interface ReviewState {
         val imagePath: String?,
         val notice: String? = null,
         val error: String? = null,
+        /** A saved receipt this one looks like; the screen asks before saving a second copy. */
+        val duplicateOf: Receipt? = null,
     ) : ReviewState
     data class Failed(val message: String) : ReviewState
 }
@@ -269,8 +272,12 @@ class ReviewViewModel(
 
     fun dismissNotice() = _state.update { s -> if (s is ReviewState.Editing) s.copy(notice = null) else s }
 
-    fun save() {
+    fun dismissDuplicate() = _state.update { s -> if (s is ReviewState.Editing) s.copy(duplicateOf = null) else s }
+
+    /** @param allowDuplicate the user has seen the "already saved?" question and wants a second copy. */
+    fun save(allowDuplicate: Boolean = false) {
         val s = _state.value as? ReviewState.Editing ?: return
+        if (saving) return
         val d = s.draft
         val total = Money.parseUserInput(d.total) ?: d.computedTotal
         if (total == null) {
@@ -286,7 +293,7 @@ class ReviewViewModel(
         val purchasedAt = d.date.atTime(d.time ?: LocalTime.NOON).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val receipt = Receipt(
             id = existing?.id ?: 0,
-            merchant = d.merchant.trim().ifBlank { "Unknown merchant" },
+            merchant = d.merchant.trim().ifBlank { Duplicates.UNKNOWN_MERCHANT },
             address = d.address.trim().ifBlank { null },
             phone = d.phone.trim().ifBlank { null },
             category = d.category.name,
@@ -311,11 +318,26 @@ class ReviewViewModel(
             if (item.name.isBlank()) return@mapNotNull null
             LineItem(receiptId = 0, position = 0, name = item.name.trim(), quantity = item.quantity.toIntOrNull()?.coerceIn(1, 999) ?: 1, priceCents = price)
         }
+        saving = true
         viewModelScope.launch {
-            _saved.value = app.receipts.save(receipt, items)
-            app.checkAlertsSoon()
+            try {
+                if (existing == null && !allowDuplicate) {
+                    val twin = Duplicates.find(receipt, app.receipts.getAll())
+                    if (twin != null) {
+                        _state.update { if (it is ReviewState.Editing) it.copy(error = null, duplicateOf = twin) else it }
+                        return@launch
+                    }
+                }
+                _state.update { if (it is ReviewState.Editing) it.copy(error = null, duplicateOf = null) else it }
+                _saved.value = app.receipts.save(receipt, items)
+                app.checkAlertsSoon()
+            } finally {
+                saving = false
+            }
         }
     }
+
+    private var saving = false
 
     override fun onCleared() {
         // A new capture the user backed out of: do not leave an orphaned photo behind.

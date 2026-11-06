@@ -37,6 +37,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press shortcuts: Scan receipt, Add manually. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <!-- "Share" a receipt photo (or several pages of one) or a PDF straight into the app. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -57,6 +61,34 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
+
+        <!-- Quick Settings tile: one tap to scan a receipt. -->
+        <service
+            android:name=".capture.ScanTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_camera"
+            android:label="@string/tile_scan"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
+
+        <!-- Home-screen widget with Scan and Add buttons (no amounts shown). -->
+        <receiver
+            android:name=".capture.QuickCaptureWidget"
+            android:exported="false"
+            android:label="@string/shortcut_scan_short">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_capture_info" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -91,6 +91,8 @@ import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.CaptureSource
 import com.alexivanov.receiptvault.ui.update.UpdateCard
 import com.alexivanov.receiptvault.update.UpdateState
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,6 +103,7 @@ fun HomeScreen(
     onManual: () -> Unit,
     onInsights: () -> Unit,
     onSettings: () -> Unit,
+    scanRequests: Flow<Unit> = emptyFlow(),
 ) {
     val vm = appViewModel { app, _ -> HomeViewModel(app) }
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -147,6 +150,8 @@ fun HomeScreen(
         onCaptured = onCaptured,
         onError = { msg -> scope.launch { snackbar.showSnackbar(msg) } },
     )
+    // "Scan receipt" from an app shortcut, the Quick Settings tile or the widget.
+    LaunchedEffect(scanRequests) { scanRequests.collect { capture.scan() } }
 
     Scaffold(
         topBar = {

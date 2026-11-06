@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget colours follow the wallpaper (Material You), light theme. -->
+<resources>
+    <color name="widget_background">@android:color/system_neutral1_50</color>
+    <color name="widget_button">@android:color/system_accent1_100</color>
+    <color name="widget_button_text">@android:color/system_accent1_900</color>
+</resources>
