@@ -80,6 +80,5 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
             r.notes.lowercase().contains(needle) ||
             r.address.orEmpty().lowercase().contains(needle) ||
             r.locationLabel.orEmpty().lowercase().contains(needle) ||
-            r.paymentMethod.orEmpty().lowercase().contains(needle) ||
             r.ocrText.lowercase().contains(needle)
 }

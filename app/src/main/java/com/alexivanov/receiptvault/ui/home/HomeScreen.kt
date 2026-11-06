@@ -265,7 +265,6 @@ private fun ReceiptRow(r: Receipt, onClick: () -> Unit) {
             val extras = listOfNotNull(
                 formatDate(r.purchasedAt),
                 r.tipCents?.takeIf { it > 0 }?.let { "tip ${money(it, r.currency)}" },
-                r.paymentMethod,
             )
             Text(extras.joinToString(" · "), maxLines = 1, overflow = TextOverflow.Ellipsis)
         },

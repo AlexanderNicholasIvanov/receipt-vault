@@ -120,8 +120,6 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                     }
                     HorizontalDivider()
                     AmountRow("Total", money(r.totalCents, r.currency), bold = true)
-                    val payment = listOfNotNull(r.paymentMethod, r.cardLast4?.let { "•••• $it" }).joinToString(" ")
-                    if (payment.isNotBlank()) AmountRow("Paid with", payment)
                 }
             }
 

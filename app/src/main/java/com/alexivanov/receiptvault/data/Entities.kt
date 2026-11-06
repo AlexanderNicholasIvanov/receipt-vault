@@ -21,8 +21,6 @@ data class Receipt(
     val discountCents: Long? = null,
     val totalCents: Long,
     val currency: String,
-    val paymentMethod: String? = null,
-    val cardLast4: String? = null,
     /** Where the receipt was scanned (device location), when the user allowed it. */
     val latitude: Double? = null,
     val longitude: Double? = null,

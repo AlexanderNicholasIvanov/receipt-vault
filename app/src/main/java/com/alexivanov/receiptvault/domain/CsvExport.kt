@@ -11,7 +11,7 @@ object CsvExport {
 
     private val HEADER = listOf(
         "id", "date", "time", "merchant", "category", "subtotal", "tax", "tip", "discount", "total", "currency",
-        "payment_method", "card_last4", "receipt_address", "scanned_at_location", "latitude", "longitude", "notes", "items",
+        "receipt_address", "scanned_at_location", "latitude", "longitude", "notes", "items",
     )
 
     fun build(receipts: List<Receipt>, items: List<LineItem>, zone: ZoneId = ZoneId.systemDefault()): String {
@@ -36,8 +36,6 @@ object CsvExport {
                 Money.toPlain(r.discountCents),
                 Money.toPlain(r.totalCents),
                 r.currency,
-                r.paymentMethod.orEmpty(),
-                r.cardLast4.orEmpty(),
                 r.address.orEmpty(),
                 r.locationLabel.orEmpty(),
                 r.latitude?.toString().orEmpty(),
