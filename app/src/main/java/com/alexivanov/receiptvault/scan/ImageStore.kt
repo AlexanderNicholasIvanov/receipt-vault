@@ -85,6 +85,13 @@ class ImageStore(private val context: Context) {
         uri
     }
 
+    /** Copies an already-processed photo (e.g. from a backup) into storage under a new name. */
+    fun adopt(source: File): File {
+        val out = File(dir, "${UUID.randomUUID()}.jpg")
+        source.copyTo(out)
+        return out
+    }
+
     fun delete(path: String?) {
         if (path.isNullOrBlank()) return
         val file = File(path)

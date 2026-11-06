@@ -87,7 +87,7 @@ class GitHubApkDownloader(private val context: Context) : ApkDownloader {
             fail(
                 apk,
                 "This update is signed with a different key than the app you have installed " +
-                    "(for example a debug build). Export your receipts to CSV, uninstall, then install ${info.versionName}.",
+                    "(for example a debug build). Back up in Settings, uninstall, install ${info.versionName}, then restore.",
             )
         }
     }
