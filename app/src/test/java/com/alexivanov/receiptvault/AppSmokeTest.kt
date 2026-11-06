@@ -72,6 +72,8 @@ class AppSmokeTest {
         compose.onNodeWithText("Day-first dates").assertExists()
         compose.onNodeWithText("App lock").assertExists()
         compose.onNodeWithText("Save scan location").assertDoesNotExist()
+        compose.onNodeWithText("Back up receipts", useUnmergedTree = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Restore from backup", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Check for updates", useUnmergedTree = true).performScrollTo().assertExists()
         compose.onNodeWithText("Check automatically", useUnmergedTree = true).assertExists()
     }

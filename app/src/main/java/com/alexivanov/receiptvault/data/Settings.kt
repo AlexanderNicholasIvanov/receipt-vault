@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.alexivanov.receiptvault.domain.Money
@@ -24,6 +25,8 @@ data class AppSettings(
     val autoCheckUpdates: Boolean = true,
     /** Ask for fingerprint/face/screen lock when opening the app. */
     val appLock: Boolean = false,
+    /** When the last backup was saved (epoch millis), or 0 if never. */
+    val lastBackupAt: Long = 0,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -32,6 +35,7 @@ class SettingsRepository(private val context: Context) {
     private val dismissedUpdate = intPreferencesKey("dismissed_update")
     private val autoCheck = booleanPreferencesKey("auto_check_updates")
     private val appLockKey = booleanPreferencesKey("app_lock")
+    private val lastBackup = longPreferencesKey("last_backup_at")
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
         val defaults = AppSettings()
@@ -41,6 +45,7 @@ class SettingsRepository(private val context: Context) {
             dismissedUpdateVersionCode = p[dismissedUpdate] ?: 0,
             autoCheckUpdates = p[autoCheck] ?: defaults.autoCheckUpdates,
             appLock = p[appLockKey] ?: false,
+            lastBackupAt = p[lastBackup] ?: 0,
         )
     }
 
@@ -51,4 +56,5 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDismissedUpdate(value: Int) = context.dataStore.edit { it[dismissedUpdate] = value }
     suspend fun setAutoCheckUpdates(value: Boolean) = context.dataStore.edit { it[autoCheck] = value }
     suspend fun setAppLock(value: Boolean) = context.dataStore.edit { it[appLockKey] = value }
+    suspend fun setLastBackupAt(value: Long) = context.dataStore.edit { it[lastBackup] = value }
 }

@@ -23,6 +23,14 @@ jobs:
           # AGP downloads the platform and build-tools it needs on its own.
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v6
+      # Robolectric downloads its Android runtime jar from Maven Central on first use.
+      # A network blip there failed a main build once; keep the jar between runs.
+      - name: Cache Robolectric runtime
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-
       - name: Lint, unit tests, debug APK
         run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
       - name: Upload lint and test reports
