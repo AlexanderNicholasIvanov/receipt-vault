@@ -23,6 +23,8 @@ data class AppSettings(
     val dismissedUpdateVersionCode: Int = 0,
     /** Look for a newer release on GitHub each time the app starts. */
     val autoCheckUpdates: Boolean = true,
+    /** Ask for fingerprint/face/screen lock when opening the app. */
+    val appLock: Boolean = false,
     /** When the last backup was saved (epoch millis), or 0 if never. */
     val lastBackupAt: Long = 0,
 )
@@ -32,6 +34,7 @@ class SettingsRepository(private val context: Context) {
     private val dayFirst = booleanPreferencesKey("day_first_dates")
     private val dismissedUpdate = intPreferencesKey("dismissed_update")
     private val autoCheck = booleanPreferencesKey("auto_check_updates")
+    private val appLockKey = booleanPreferencesKey("app_lock")
     private val lastBackup = longPreferencesKey("last_backup_at")
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -41,6 +44,7 @@ class SettingsRepository(private val context: Context) {
             dayFirstDates = p[dayFirst] ?: defaults.dayFirstDates,
             dismissedUpdateVersionCode = p[dismissedUpdate] ?: 0,
             autoCheckUpdates = p[autoCheck] ?: defaults.autoCheckUpdates,
+            appLock = p[appLockKey] ?: false,
             lastBackupAt = p[lastBackup] ?: 0,
         )
     }
@@ -51,5 +55,6 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDayFirstDates(value: Boolean) = context.dataStore.edit { it[dayFirst] = value }
     suspend fun setDismissedUpdate(value: Int) = context.dataStore.edit { it[dismissedUpdate] = value }
     suspend fun setAutoCheckUpdates(value: Boolean) = context.dataStore.edit { it[autoCheck] = value }
+    suspend fun setAppLock(value: Boolean) = context.dataStore.edit { it[appLockKey] = value }
     suspend fun setLastBackupAt(value: Long) = context.dataStore.edit { it[lastBackup] = value }
 }
