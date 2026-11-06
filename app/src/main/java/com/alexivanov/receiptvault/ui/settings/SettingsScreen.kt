@@ -81,13 +81,6 @@ fun SettingsScreen(onBack: () -> Unit) {
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             Column(Modifier.padding(horizontal = 16.dp)) { SectionTitle("Scanning") }
             ListItem(
-                headlineContent = { Text("Save scan location") },
-                supportingContent = { Text("Attach where you were when scanning with the camera. Gallery imports never use your current location.") },
-                trailingContent = {
-                    Switch(checked = settings.tagLocation, onCheckedChange = { v -> scope.launch { app.settings.setTagLocation(v) } })
-                },
-            )
-            ListItem(
                 headlineContent = { Text("Day-first dates") },
                 supportingContent = { Text("Read 03/04/2026 as 3 April rather than March 4.") },
                 trailingContent = {

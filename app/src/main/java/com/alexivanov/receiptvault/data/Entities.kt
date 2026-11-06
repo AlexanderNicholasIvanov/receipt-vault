@@ -21,10 +21,6 @@ data class Receipt(
     val discountCents: Long? = null,
     val totalCents: Long,
     val currency: String,
-    /** Where the receipt was scanned (device location), when the user allowed it. */
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val locationLabel: String? = null,
     val notes: String = "",
     /** Absolute path of the stored photo inside app-private storage. */
     val imagePath: String? = null,

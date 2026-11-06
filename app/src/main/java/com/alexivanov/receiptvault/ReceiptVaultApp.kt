@@ -6,7 +6,6 @@ import com.alexivanov.receiptvault.data.AppDatabase
 import com.alexivanov.receiptvault.data.ReceiptRepository
 import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.scan.ImageStore
-import com.alexivanov.receiptvault.scan.LocationService
 import com.alexivanov.receiptvault.scan.TextReader
 import com.alexivanov.receiptvault.update.GitHubApkDownloader
 import com.alexivanov.receiptvault.update.UpdateChecker
@@ -35,7 +34,6 @@ class AppContainer(context: Context) {
     val receipts = ReceiptRepository(database.receiptDao(), images)
     val settings = SettingsRepository(context)
     val textReader = TextReader(context)
-    val location = LocationService(context)
 
     private val apkDownloader = GitHubApkDownloader(context).also { it.clearDownloads() }
 

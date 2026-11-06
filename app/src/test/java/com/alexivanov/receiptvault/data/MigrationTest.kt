@@ -34,7 +34,7 @@ class MigrationTest {
     }
 
     @Test
-    fun `v1 receipts and line items survive and payment columns are gone`() {
+    fun `v1 install keeps receipts and line items, payment and scan location are gone`() {
         createAtVersion(1) { db ->
             db.execSQL(
                 """INSERT INTO receipts (id, merchant, address, phone, category, purchasedAt, subtotalCents, taxCents,
@@ -43,9 +43,28 @@ class MigrationTest {
                    VALUES (7, 'Corner Cafe', '1 Main St', NULL, 'DINING', 1000, 2000, 160, 400, NULL, 2560, 'USD',
                    'Visa', '4821', 40.1, -73.2, 'Main St', 'lunch', NULL, 'CORNER CAFE', 1, 2)""",
             )
-            db.execSQL("INSERT INTO line_items (id, receiptId, position, name, quantity, priceCents) VALUES (1, 7, 0, 'Latte', 2, 900)")
+            db.execSQL(LINE_ITEM)
         }
+        assertMigrated()
+    }
 
+    @Test
+    fun `v2 install keeps receipts and line items, scan location is gone`() {
+        createAtVersion(2) { db ->
+            db.execSQL(
+                """INSERT INTO receipts (id, merchant, address, phone, category, purchasedAt, subtotalCents, taxCents,
+                   tipCents, discountCents, totalCents, currency, latitude, longitude,
+                   locationLabel, notes, imagePath, ocrText, createdAt, updatedAt)
+                   VALUES (7, 'Corner Cafe', '1 Main St', NULL, 'DINING', 1000, 2000, 160, 400, NULL, 2560, 'USD',
+                   40.1, -73.2, 'Main St', 'lunch', NULL, 'CORNER CAFE', 1, 2)""",
+            )
+            db.execSQL(LINE_ITEM)
+        }
+        assertMigrated()
+    }
+
+    /** Opens the database with the current [AppDatabase], which runs the shipped migrations. */
+    private fun assertMigrated() {
         val room = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, name).build()
         try {
             val dao = room.receiptDao()
@@ -61,8 +80,9 @@ class MigrationTest {
             val columns = room.openHelper.readableDatabase.query("PRAGMA table_info(receipts)").use { c ->
                 buildList { while (c.moveToNext()) add(c.getString(c.getColumnIndexOrThrow("name"))) }
             }
-            assertFalse("paymentMethod" in columns)
-            assertFalse("cardLast4" in columns)
+            for (gone in listOf("paymentMethod", "cardLast4", "latitude", "longitude", "locationLabel")) {
+                assertFalse("$gone should be dropped", gone in columns)
+            }
         } finally {
             room.close()
         }
@@ -88,5 +108,9 @@ class MigrationTest {
             fill(db)
             db.version = version
         }
+    }
+
+    private companion object {
+        const val LINE_ITEM = "INSERT INTO line_items (id, receiptId, position, name, quantity, priceCents) VALUES (1, 7, 0, 'Latte', 2, 900)"
     }
 }

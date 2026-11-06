@@ -248,7 +248,7 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
             }
         }
 
-        item { SectionTitle("Location") }
+        item { SectionTitle("Address") }
         item {
             OutlinedTextField(
                 value = d.address, onValueChange = { v -> vm.edit { it.copy(address = v) } },
@@ -262,24 +262,6 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             )
         }
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Scanned at", style = MaterialTheme.typography.labelMedium)
-                        Text(d.locationLabel.ifBlank { if (d.latitude != null) "%.5f, %.5f".format(d.latitude, d.longitude) else "Not set" })
-                    }
-                    if (d.latitude != null) {
-                        TextButton(onClick = vm::clearLocation) { Text("Clear") }
-                    } else {
-                        TextButton(onClick = vm::useCurrentLocation) { Text("Use current") }
-                    }
-                }
-            }
-        }
-
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SectionTitle("Items (${d.items.size})", Modifier.weight(1f))

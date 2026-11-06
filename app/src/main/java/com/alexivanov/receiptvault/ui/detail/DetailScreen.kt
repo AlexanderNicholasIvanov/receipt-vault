@@ -123,17 +123,18 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                 }
             }
 
-            if (r.address != null || r.locationLabel != null || r.latitude != null || r.phone != null) {
-                SectionTitle("Location")
+            if (r.address != null || r.phone != null) {
+                SectionTitle("Store")
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         r.address?.let { LabeledText("Store address", it) }
                         r.phone?.let { LabeledText("Phone", it) }
-                        (r.locationLabel ?: r.latitude?.let { "%.5f, %.5f".format(it, r.longitude) })?.let { LabeledText("Scanned at", it) }
-                        OutlinedButton(onClick = { openMap(context, r) }) {
-                            Icon(Icons.Default.LocationOn, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Open in Maps")
+                        if (r.address != null) {
+                            OutlinedButton(onClick = { openMap(context, r.merchant, r.address) }) {
+                                Icon(Icons.Default.LocationOn, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Open in Maps")
+                            }
                         }
                     }
                 }
@@ -195,18 +196,13 @@ private fun LabeledText(label: String, value: String) {
     }
 }
 
-private fun openMap(context: android.content.Context, r: Receipt) {
-    val query = r.address ?: r.locationLabel
-    val uri = when {
-        r.latitude != null && r.longitude != null ->
-            ("geo:${r.latitude},${r.longitude}?q=" + Uri.encode(query ?: "${r.latitude},${r.longitude}(${r.merchant})")).toUri()
-        query != null -> ("geo:0,0?q=" + Uri.encode("${r.merchant}, $query")).toUri()
-        else -> return
-    }
+/** Looks up the store address printed on the receipt. */
+private fun openMap(context: android.content.Context, merchant: String, address: String) {
+    val query = Uri.encode("$merchant, $address")
     try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        context.startActivity(Intent(Intent.ACTION_VIEW, "geo:0,0?q=$query".toUri()))
     } catch (_: ActivityNotFoundException) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, ("https://maps.google.com/?q=" + Uri.encode(query ?: "${r.latitude},${r.longitude}")).toUri()))
+        context.startActivity(Intent(Intent.ACTION_VIEW, "https://maps.google.com/?q=$query".toUri()))
     }
 }
 
