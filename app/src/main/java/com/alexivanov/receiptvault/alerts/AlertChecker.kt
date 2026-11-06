@@ -4,6 +4,7 @@ import com.alexivanov.receiptvault.data.ReceiptRepository
 import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.domain.BudgetLevel
 import com.alexivanov.receiptvault.domain.BudgetMath
+import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Reminder
 import com.alexivanov.receiptvault.domain.Reminders
@@ -47,7 +48,7 @@ class AlertChecker(
         }
 
         val month = YearMonth.from(today)
-        for (use in BudgetMath.usage(s.budgets, all, s.defaultCurrency, month, zone)) {
+        for (use in BudgetMath.usage(s.budgets, Conversion.toBase(all, s.activeRates), s.defaultCurrency, month, zone)) {
             val key = BudgetMath.alertKey(month, use) ?: continue
             if (key in sent) continue
             notifier.budget(use, s.defaultCurrency)

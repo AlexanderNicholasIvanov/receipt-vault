@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
+import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.Summary
@@ -69,10 +70,11 @@ fun InsightsScreen(onBack: () -> Unit) {
     var period by remember { mutableStateOf(Period.THIS_YEAR) }
 
     val today = LocalDate.now()
-    val summary = remember(all, period, settings.defaultCurrency) {
-        Insights.summarize(Insights.inPeriod(all, period, today), settings.defaultCurrency)
+    val rates = settings.activeRates
+    val summary = remember(all, period, settings.defaultCurrency, rates) {
+        Insights.summarize(Insights.inPeriod(all, period, today), settings.defaultCurrency, rates)
     }
-    val monthly = remember(all, summary.currency) { Insights.monthly(all, summary.currency, today) }
+    val monthly = remember(all, summary.currency, rates) { Insights.monthly(Conversion.toBase(all, rates), summary.currency, today) }
 
     Scaffold(
         topBar = {
@@ -93,7 +95,7 @@ fun InsightsScreen(onBack: () -> Unit) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Monthly spending", style = MaterialTheme.typography.titleMedium)
-                        Text("Last 6 months · ${summary.currency}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Last 6 months · ${summary.currency}" + if (rates != null) " · other currencies converted" else "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(12.dp))
                         MonthlyBars(monthly, summary.currency)
                     }

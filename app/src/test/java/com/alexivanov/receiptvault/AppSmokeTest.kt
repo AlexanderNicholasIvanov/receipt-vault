@@ -10,11 +10,18 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.alexivanov.receiptvault.data.Receipt
+import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.ExchangeRates
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.math.BigDecimal
+import java.time.LocalDate
 
 /**
  * Launches the real app on the JVM (Robolectric, Android 16) and walks the
@@ -172,6 +179,42 @@ class AppSmokeTest {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("left of", substring = true), 10_000)
         compose.onNodeWithText("$5.00 left of $30.00 budget").assertExists()
+    }
+
+    @Test
+    fun `other currencies count once conversion is on`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        try {
+            runBlocking {
+                app.settings.setDefaultCurrency("USD")
+                // Fresh rates, so nothing is downloaded during the test.
+                app.settings.setExchangeRates(
+                    ExchangeRates("USD", LocalDate.parse("2026-11-05"), mapOf("EUR" to BigDecimal("0.5")), System.currentTimeMillis()),
+                )
+                val now = System.currentTimeMillis()
+                app.receipts.save(Receipt(merchant = "Paris Bistro", category = Category.DINING.name, totalCents = 1000, currency = "EUR", purchasedAt = now, createdAt = now, updatedAt = now), emptyList())
+                app.receipts.save(Receipt(merchant = "Corner Cafe", category = Category.DINING.name, totalCents = 500, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now), emptyList())
+            }
+            compose.waitUntilAtLeastOneExists(hasText("Paris Bistro"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("in other currencies not included", substring = true), 5_000)
+
+            compose.onNodeWithContentDescription("Settings").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Convert other currencies"), 5_000)
+            compose.onNodeWithText("frankfurter.dev", substring = true).assertExists()
+            runBlocking { app.settings.setConvertCurrencies(true) }
+            compose.waitUntilAtLeastOneExists(hasText("at the European Central Bank rates of 2026-11-05", substring = true), 5_000)
+            compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+
+            // €10.00 at 0.5 is $20.00, plus $5.00.
+            compose.waitUntilAtLeastOneExists(hasText("$25.00"), 10_000)
+            compose.onNodeWithText("Includes 1 receipt(s) in other currencies", substring = true).assertExists()
+        } finally {
+            runBlocking {
+                app.settings.setConvertCurrencies(false)
+                app.settings.setExchangeRates(null)
+            }
+        }
     }
 
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {

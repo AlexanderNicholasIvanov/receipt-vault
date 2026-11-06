@@ -57,6 +57,8 @@ import com.alexivanov.receiptvault.ui.shareFile
 import com.alexivanov.receiptvault.ui.update.UpdateCard
 import com.alexivanov.receiptvault.update.UpdateState
 import kotlinx.coroutines.Dispatchers
+import com.alexivanov.receiptvault.data.RatesStatus
+import androidx.compose.material3.TextButton
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -73,6 +75,7 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
     var currency by remember { mutableStateOf("") }
     val updateState by app.updates.state.collectAsStateWithLifecycle()
     val trash by app.receipts.trash.collectAsStateWithLifecycle(initialValue = emptyList())
+    val ratesStatus by app.exchangeRates.status.collectAsStateWithLifecycle()
 
     LaunchedEffect(settings.defaultCurrency) { currency = settings.defaultCurrency }
 
@@ -147,6 +150,31 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            ListItem(
+                headlineContent = { Text("Convert other currencies") },
+                supportingContent = {
+                    Text(
+                        conversionText(
+                            on = settings.convertCurrencies,
+                            status = ratesStatus,
+                            ratesDate = settings.activeRates?.date,
+                            currency = settings.defaultCurrency,
+                        ),
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = settings.convertCurrencies,
+                        onCheckedChange = { v -> scope.launch { app.settings.setConvertCurrencies(v) } },
+                    )
+                },
+            )
+            if (settings.convertCurrencies && ratesStatus is RatesStatus.Failed) {
+                TextButton(
+                    onClick = { scope.launch { if (app.exchangeRates.refreshIfNeeded(force = true)) app.checkAlertsSoon() } },
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                ) { Text("Try again") }
+            }
             HorizontalDivider()
 
             Column(Modifier.padding(horizontal = 16.dp)) { SectionTitle("Security") }
@@ -249,7 +277,7 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
             ListItem(
                 headlineContent = { Text("Privacy") },
                 supportingContent = {
-                    Text("Receipts, photos and text recognition stay on this phone unless you save a backup somewhere else. The app only goes online to check GitHub for updates, and never asks for your location.")
+                    Text("Receipts, photos and text recognition stay on this phone unless you save a backup somewhere else. The app only goes online to check GitHub for updates and, if you turn on currency conversion, to download exchange rates (only your currency code is sent). It never asks for your location.")
                 },
             )
             HorizontalDivider()
@@ -299,4 +327,13 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
             )
         }
     }
+}
+
+private fun conversionText(on: Boolean, status: RatesStatus, ratesDate: LocalDate?, currency: String): String = when {
+    !on -> "Count receipts in other currencies in totals and budgets, using daily European Central Bank rates (downloaded from frankfurter.dev)."
+    status is RatesStatus.Loading -> "Downloading today's rates…"
+    status is RatesStatus.Failed && ratesDate != null -> "${status.message} Using the rates of $ratesDate."
+    status is RatesStatus.Failed -> status.message
+    ratesDate != null -> "Other currencies are converted to $currency at the European Central Bank rates of $ratesDate."
+    else -> "Waiting for rates…"
 }

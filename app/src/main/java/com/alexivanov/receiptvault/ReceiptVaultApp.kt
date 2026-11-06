@@ -7,6 +7,8 @@ import com.alexivanov.receiptvault.alerts.AlertWorker
 import com.alexivanov.receiptvault.alerts.AndroidNotifier
 import com.alexivanov.receiptvault.data.AppDatabase
 import com.alexivanov.receiptvault.data.BackupManager
+import com.alexivanov.receiptvault.data.ExchangeRateRepository
+import com.alexivanov.receiptvault.data.FrankfurterRateSource
 import com.alexivanov.receiptvault.data.ReceiptRepository
 import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.scan.ImageStore
@@ -18,6 +20,8 @@ import com.alexivanov.receiptvault.update.UpdateController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class ReceiptVaultApp : Application() {
@@ -44,6 +48,7 @@ class AppContainer(val context: Context) {
     val textReader = TextReader(context)
     val pdfPages = PdfPages(context)
     val alerts = AlertChecker(receipts, settings, AndroidNotifier(context))
+    val exchangeRates = ExchangeRateRepository(settings, FrankfurterRateSource())
 
     private val apkDownloader = GitHubApkDownloader(context).also { it.clearDownloads() }
 
@@ -59,6 +64,12 @@ class AppContainer(val context: Context) {
         appScope.launch {
             runCatching { receipts.purgeExpiredTrash() }
             runCatching { alerts.run() }
+        }
+        // Download rates when conversion is turned on or the default currency changes, and once a day.
+        appScope.launch {
+            settings.settings.map { it.convertCurrencies to it.defaultCurrency }.distinctUntilChanged().collect { (on, _) ->
+                if (on && runCatching { exchangeRates.refreshIfNeeded() }.getOrDefault(false)) runCatching { alerts.run() }
+            }
         }
     }
 

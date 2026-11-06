@@ -36,6 +36,9 @@ data class Summary(
     val topMerchants: List<Pair<String, Long>>,
     /** Receipts in the period that use another currency and are left out of the sums. */
     val otherCurrencyCount: Int,
+    /** Receipts in another currency that are included, converted at [ratesDate]'s rates. */
+    val convertedCount: Int = 0,
+    val ratesDate: LocalDate? = null,
 )
 
 object Insights {
@@ -55,9 +58,12 @@ object Insights {
     fun primaryCurrency(receipts: List<Receipt>, fallback: String): String =
         receipts.groupingBy { it.currency }.eachCount().maxByOrNull { it.value }?.key ?: fallback
 
-    fun summarize(receipts: List<Receipt>, fallbackCurrency: String): Summary {
+    /** With [rates], receipts in other currencies are converted to the rates' base before adding up. */
+    fun summarize(original: List<Receipt>, fallbackCurrency: String, rates: ExchangeRates? = null): Summary {
+        val receipts = Conversion.toBase(original, rates)
         val currency = primaryCurrency(receipts, fallbackCurrency)
         val same = receipts.filter { it.currency == currency }
+        val converted = original.zip(receipts).count { (o, c) -> c.currency == currency && o.currency != currency }
         val tipped = same.filter { (it.tipCents ?: 0) > 0 && (it.subtotalCents ?: 0) > 0 }
         val total = same.sumOf { it.totalCents }
         return Summary(
@@ -80,6 +86,8 @@ object Insights {
                 .sortedByDescending { it.second }
                 .take(5),
             otherCurrencyCount = receipts.size - same.size,
+            convertedCount = converted,
+            ratesDate = rates?.date?.takeIf { converted > 0 },
         )
     }
 

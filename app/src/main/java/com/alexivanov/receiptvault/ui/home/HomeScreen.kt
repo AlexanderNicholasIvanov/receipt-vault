@@ -400,6 +400,14 @@ private fun SummaryCard(s: Summary, budget: BudgetUse?) {
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
+            if (s.convertedCount > 0 && s.ratesDate != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Includes ${s.convertedCount} receipt(s) in other currencies, converted at ${shortDate(s.ratesDate)} rates",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
             if (s.otherCurrencyCount > 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -481,3 +489,6 @@ private fun EmptyState(onScan: () -> Unit) {
         TextButton(onClick = onScan) { Text("Add your first receipt") }
     }
 }
+
+private fun shortDate(date: java.time.LocalDate): String =
+    date.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM))

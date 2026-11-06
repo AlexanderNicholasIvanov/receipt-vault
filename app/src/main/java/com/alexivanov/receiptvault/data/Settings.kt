@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.alexivanov.receiptvault.domain.Budgets
+import com.alexivanov.receiptvault.domain.ExchangeRates
 import com.alexivanov.receiptvault.domain.Money
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -31,7 +32,15 @@ data class AppSettings(
     val lastBackupAt: Long = 0,
     /** Monthly spending limits in [defaultCurrency]. */
     val budgets: Budgets = Budgets(),
-)
+    /** Count receipts in other currencies in totals and budgets, at downloaded rates. Off unless turned on. */
+    val convertCurrencies: Boolean = false,
+    /** Last downloaded rates, kept for offline use. */
+    val exchangeRates: ExchangeRates? = null,
+) {
+    /** The rates to convert with right now: on, downloaded, and for the current default currency. */
+    val activeRates: ExchangeRates?
+        get() = exchangeRates?.takeIf { convertCurrencies && it.base == defaultCurrency }
+}
 
 class SettingsRepository(private val context: Context) {
     private val currency = stringPreferencesKey("default_currency")
@@ -42,6 +51,8 @@ class SettingsRepository(private val context: Context) {
     private val lastBackup = longPreferencesKey("last_backup_at")
     private val budgetsKey = stringPreferencesKey("budgets")
     private val sentAlerts = stringSetPreferencesKey("sent_alerts")
+    private val convertKey = booleanPreferencesKey("convert_currencies")
+    private val ratesKey = stringPreferencesKey("exchange_rates")
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
         val defaults = AppSettings()
@@ -53,6 +64,8 @@ class SettingsRepository(private val context: Context) {
             appLock = p[appLockKey] ?: false,
             lastBackupAt = p[lastBackup] ?: 0,
             budgets = Budgets.decode(p[budgetsKey]),
+            convertCurrencies = p[convertKey] ?: false,
+            exchangeRates = ExchangeRates.decode(p[ratesKey]),
         )
     }
 
@@ -65,6 +78,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAppLock(value: Boolean) = context.dataStore.edit { it[appLockKey] = value }
     suspend fun setLastBackupAt(value: Long) = context.dataStore.edit { it[lastBackup] = value }
     suspend fun setBudgets(value: Budgets) = context.dataStore.edit { it[budgetsKey] = value.encode() }
+    suspend fun setConvertCurrencies(value: Boolean) = context.dataStore.edit { it[convertKey] = value }
+    suspend fun setExchangeRates(value: ExchangeRates?) = context.dataStore.edit {
+        if (value == null) it.remove(ratesKey) else it[ratesKey] = value.encode()
+    }
 
     /** Keys of reminder and budget notifications already shown, so each one is sent once. */
     suspend fun sentAlerts(): Set<String> = context.dataStore.data.first()[sentAlerts].orEmpty()
