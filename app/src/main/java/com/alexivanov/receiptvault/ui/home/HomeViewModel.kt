@@ -9,7 +9,8 @@ import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.Summary
-import com.alexivanov.receiptvault.update.UpdateInfo
+import com.alexivanov.receiptvault.update.UpdateController
+import com.alexivanov.receiptvault.update.UpdateState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,8 @@ data class HomeUi(
     val receipts: List<Receipt> = emptyList(),
     val summary: Summary? = null,
     val hasAny: Boolean = false,
-    val update: UpdateInfo? = null,
+    /** Update to show in the home banner, or null. */
+    val update: UpdateState? = null,
     val settings: AppSettings = AppSettings(),
 )
 
@@ -33,8 +35,16 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
     private val period = MutableStateFlow(Period.THIS_MONTH)
     private val query = MutableStateFlow("")
 
-    private val visibleUpdate = combine(app.update, app.settings.settings) { info, s ->
-        info?.takeIf { it.versionCode > s.dismissedUpdateVersionCode }
+    val updates: UpdateController = app.updates
+
+    // "Later" hides an offered release until a newer one appears; once a download
+    // has started the banner stays so progress and the Install button remain visible.
+    private val visibleUpdate = combine(app.updates.state, app.settings.settings) { state, s ->
+        when (state) {
+            is UpdateState.Available -> state.takeIf { it.info.versionCode > s.dismissedUpdateVersionCode }
+            is UpdateState.Downloading, is UpdateState.ReadyToInstall, is UpdateState.DownloadFailed -> state
+            else -> null
+        }
     }
 
     val ui: StateFlow<HomeUi> = combine(app.receipts.receipts, period, query, visibleUpdate, app.settings.settings) { all, p, q, update, settings ->
@@ -54,7 +64,7 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
     init {
-        app.checkForUpdateOnce()
+        app.checkForUpdatesOnLaunch()
     }
 
     fun setPeriod(p: Period) { period.value = p }

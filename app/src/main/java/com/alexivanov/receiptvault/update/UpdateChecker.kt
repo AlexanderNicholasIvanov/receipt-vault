@@ -15,6 +15,8 @@ data class UpdateInfo(
     val apkUrl: String,
     val releaseUrl: String,
     val sizeBytes: Long,
+    /** Lowercase hex SHA-256 of the APK as published by GitHub, when GitHub provides one. */
+    val sha256: String? = null,
 )
 
 @Serializable
@@ -30,6 +32,8 @@ internal data class GitHubAsset(
     @SerialName("name") val name: String = "",
     @SerialName("browser_download_url") val browserDownloadUrl: String = "",
     @SerialName("size") val size: Long = 0,
+    /** "sha256:<hex>" on releases GitHub has fingerprinted. */
+    @SerialName("digest") val digest: String? = null,
 )
 
 /**
@@ -37,7 +41,7 @@ internal data class GitHubAsset(
  * running build. Every failure (offline, rate limit, bad JSON, no APK) is a
  * quiet [Outcome.Failed] or [Outcome.UpToDate]; it never blocks the UI.
  */
-class UpdateChecker(private val repo: String) {
+class UpdateChecker(private val repo: String) : ReleaseSource {
 
     sealed interface Outcome {
         data class Newer(val info: UpdateInfo) : Outcome
@@ -45,7 +49,7 @@ class UpdateChecker(private val repo: String) {
         data object Failed : Outcome
     }
 
-    suspend fun check(currentVersionCode: Int): Outcome = withContext(Dispatchers.IO) {
+    override suspend fun check(currentVersionCode: Int): Outcome = withContext(Dispatchers.IO) {
         try {
             val conn = URL("https://api.github.com/repos/$repo/releases/latest").openConnection() as HttpURLConnection
             conn.connectTimeout = 8_000
@@ -81,7 +85,9 @@ class UpdateChecker(private val repo: String) {
             if (code <= currentVersionCode) return Outcome.UpToDate
             val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) && it.browserDownloadUrl.isNotBlank() }
                 ?: return Outcome.UpToDate
-            return Outcome.Newer(UpdateInfo(code, release.tagName, apk.browserDownloadUrl, release.htmlUrl, apk.size))
+            val sha256 = apk.digest?.takeIf { it.startsWith("sha256:", ignoreCase = true) }?.substring(7)?.lowercase()
+                ?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+            return Outcome.Newer(UpdateInfo(code, release.tagName, apk.browserDownloadUrl, release.htmlUrl, apk.size, sha256))
         }
     }
 }

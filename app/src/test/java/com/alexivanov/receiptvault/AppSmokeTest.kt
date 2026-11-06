@@ -70,5 +70,7 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Export to CSV"), 5_000)
         compose.onNodeWithText("Save scan location").assertExists()
+        compose.onNodeWithText("Check for updates", useUnmergedTree = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Check automatically", useUnmergedTree = true).assertExists()
     }
 }

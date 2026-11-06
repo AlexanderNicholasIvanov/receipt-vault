@@ -22,6 +22,8 @@ data class AppSettings(
     /** Read 03/04/2026 as 3 April instead of March 4. */
     val dayFirstDates: Boolean = Locale.getDefault().country !in setOf("US", "CA", "PH"),
     val dismissedUpdateVersionCode: Int = 0,
+    /** Look for a newer release on GitHub each time the app starts. */
+    val autoCheckUpdates: Boolean = true,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -29,6 +31,7 @@ class SettingsRepository(private val context: Context) {
     private val currency = stringPreferencesKey("default_currency")
     private val dayFirst = booleanPreferencesKey("day_first_dates")
     private val dismissedUpdate = intPreferencesKey("dismissed_update")
+    private val autoCheck = booleanPreferencesKey("auto_check_updates")
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
         val defaults = AppSettings()
@@ -37,6 +40,7 @@ class SettingsRepository(private val context: Context) {
             defaultCurrency = p[currency] ?: defaults.defaultCurrency,
             dayFirstDates = p[dayFirst] ?: defaults.dayFirstDates,
             dismissedUpdateVersionCode = p[dismissedUpdate] ?: 0,
+            autoCheckUpdates = p[autoCheck] ?: defaults.autoCheckUpdates,
         )
     }
 
@@ -46,4 +50,5 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDefaultCurrency(value: String) = context.dataStore.edit { it[currency] = value }
     suspend fun setDayFirstDates(value: Boolean) = context.dataStore.edit { it[dayFirst] = value }
     suspend fun setDismissedUpdate(value: Int) = context.dataStore.edit { it[dismissedUpdate] = value }
+    suspend fun setAutoCheckUpdates(value: Boolean) = context.dataStore.edit { it[autoCheck] = value }
 }
