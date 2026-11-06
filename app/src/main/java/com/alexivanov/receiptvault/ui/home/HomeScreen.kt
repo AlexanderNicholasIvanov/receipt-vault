@@ -76,6 +76,7 @@ import com.alexivanov.receiptvault.R
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.Period
+import com.alexivanov.receiptvault.domain.SortOrder
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.ui.appViewModel
 import com.alexivanov.receiptvault.ui.formatDate
@@ -100,6 +101,7 @@ fun HomeScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showSheet by remember { mutableStateOf(false) }
+    var showFilters by remember { mutableStateOf(false) }
 
     val selected by vm.selected.collectAsStateWithLifecycle()
     val selecting = selected.isNotEmpty()
@@ -194,8 +196,29 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    item {
+                        val n = ui.filter.activeCount
+                        FilterChip(
+                            selected = n > 0 || ui.filter.sort != SortOrder.NEWEST,
+                            onClick = { showFilters = true },
+                            label = { Text(if (n > 0) "Filters ($n)" else "Filters") },
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_filter), contentDescription = null, Modifier.size(18.dp)) },
+                        )
+                    }
+                    val from = ui.filter.from
+                    val to = ui.filter.to
+                    if (from != null && to != null) {
+                        item {
+                            FilterChip(
+                                selected = true,
+                                onClick = { vm.setFilter(ui.filter.copy(from = null, to = null)) },
+                                label = { Text(if (from == to) formatDate(from) else "${formatDate(from)} – ${formatDate(to)}") },
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear dates", Modifier.size(18.dp)) },
+                            )
+                        }
+                    }
                     items(Period.entries) { p ->
-                        FilterChip(selected = ui.period == p, onClick = { vm.setPeriod(p) }, label = { Text(p.label) })
+                        FilterChip(selected = !ui.filter.hasDates && ui.period == p, onClick = { vm.setPeriod(p) }, label = { Text(p.label) })
                     }
                 }
             }
@@ -222,7 +245,11 @@ fun HomeScreen(
                 !ui.hasAny -> item { EmptyState(onScan = { showSheet = true }) }
                 ui.receipts.isEmpty() -> item {
                     Text(
-                        if (ui.query.isBlank()) "No receipts in this period." else "No receipts match \"${ui.query}\".",
+                        when {
+                            ui.query.isNotBlank() -> "No receipts match \"${ui.query}\"."
+                            ui.filter.activeCount > 0 -> "No receipts match these filters."
+                            else -> "No receipts in this period."
+                        },
                         modifier = Modifier.fillMaxWidth().padding(32.dp),
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -239,6 +266,14 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    if (showFilters) {
+        FilterSheet(
+            current = ui.filter,
+            onApply = { vm.setFilter(it); showFilters = false },
+            onDismiss = { showFilters = false },
+        )
     }
 
     if (showSheet) {

@@ -93,6 +93,32 @@ class AppSmokeTest {
         compose.waitUntilAtLeastOneExists(hasText("The trash is empty."), 5_000)
     }
 
+    @Test
+    fun `filters narrow and sort the list`() {
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        addManualReceipt("Corner Cafe", "25.60")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
+        addManualReceipt("Shell", "40.00")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
+
+        compose.onNodeWithText("Filters").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("At least"), 5_000)
+        compose.onNodeWithText("At least").performTextInput("30")
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
+
+        compose.waitUntilAtLeastOneExists(hasText("Filters (1)"), 5_000)
+        compose.waitUntilDoesNotExist(hasText("Corner Cafe"), 5_000)
+        compose.onNodeWithText("Shell").assertExists()
+
+        compose.onNodeWithText("Filters (1)").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Reset"), 5_000)
+        compose.onNodeWithText("Reset").performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 5_000)
+        compose.onNodeWithText("Filters").assertExists()
+    }
+
     private fun addManualReceipt(merchant: String, total: String) {
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
