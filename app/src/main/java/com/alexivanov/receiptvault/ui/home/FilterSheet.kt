@@ -46,9 +46,10 @@ import java.time.ZoneOffset
 /** Sort, categories, amount and a custom date range for the home list. Changes apply on "Show results". */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FilterSheet(current: ReceiptFilter, onApply: (ReceiptFilter) -> Unit, onDismiss: () -> Unit) {
+fun FilterSheet(current: ReceiptFilter, tagsInUse: List<String>, onApply: (ReceiptFilter) -> Unit, onDismiss: () -> Unit) {
     var sort by remember { mutableStateOf(current.sort) }
     var categories by remember { mutableStateOf(current.categories) }
+    var tags by remember { mutableStateOf(current.tags) }
     var min by remember { mutableStateOf(current.minCents?.let(::plain).orEmpty()) }
     var max by remember { mutableStateOf(current.maxCents?.let(::plain).orEmpty()) }
     var from by remember { mutableStateOf(current.from) }
@@ -73,6 +74,19 @@ fun FilterSheet(current: ReceiptFilter, onApply: (ReceiptFilter) -> Unit, onDism
                         onClick = { categories = if (c in categories) categories - c else categories + c },
                         label = { Text("${c.emoji} ${c.label}") },
                     )
+                }
+            }
+
+            if (tagsInUse.isNotEmpty()) {
+                Text("Tags", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tagsInUse.forEach { t ->
+                        FilterChip(
+                            selected = t in tags,
+                            onClick = { tags = if (t in tags) tags - t else tags + t },
+                            label = { Text("#$t") },
+                        )
+                    }
                 }
             }
 
@@ -115,6 +129,8 @@ fun FilterSheet(current: ReceiptFilter, onApply: (ReceiptFilter) -> Unit, onDism
                     onApply(
                         ReceiptFilter(
                             categories = categories,
+                            // A tag that no receipt uses any more would hide everything with no chip to untick.
+                            tags = tags.filterTo(HashSet()) { it in tagsInUse },
                             minCents = lo,
                             maxCents = hi,
                             from = from.takeIf { to != null },

@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.ui.review
 
+import com.alexivanov.receiptvault.domain.Tags
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -136,6 +137,7 @@ fun ReviewScreen(onBack: () -> Unit, onSaved: (Long) -> Unit) {
 @Composable
 private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
     val d = s.draft
+    val tagsInUse by vm.tagsInUse.collectAsStateWithLifecycle()
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
     var showImage by remember { mutableStateOf(false) }
@@ -296,6 +298,27 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
                 value = d.notes, onValueChange = { v -> vm.edit { it.copy(notes = v) } },
                 label = { Text("Notes (business expense, warranty…)") }, minLines = 2, modifier = Modifier.fillMaxWidth(),
             )
+        }
+        item {
+            OutlinedTextField(
+                value = d.tags, onValueChange = { v -> vm.edit { it.copy(tags = v) } },
+                label = { Text("Tags") },
+                placeholder = { Text("work, Berlin trip") },
+                supportingText = { Text("Separate tags with commas.") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+        }
+        val current = Tags.parse(d.tags).map { it.lowercase() }.toSet()
+        val suggestions = tagsInUse.filter { it.lowercase() !in current }.take(8)
+        if (suggestions.isNotEmpty()) {
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    suggestions.forEach { t ->
+                        AssistChip(onClick = { vm.addTag(t) }, label = { Text("+ $t") })
+                    }
+                }
+            }
         }
         item {
             Button(onClick = vm::save, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp)) {

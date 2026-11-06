@@ -1,5 +1,8 @@
 package com.alexivanov.receiptvault.ui.home
 
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.filled.MoreVert
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -77,6 +80,7 @@ import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.SortOrder
+import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.ui.appViewModel
 import com.alexivanov.receiptvault.ui.formatDate
@@ -102,6 +106,21 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var showSheet by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
+    var showMore by remember { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+    fun makeReport() {
+        if (working) return
+        working = true
+        scope.launch {
+            try {
+                shareFile(context, vm.expenseReport(context.cacheDir), "application/pdf", "Share expense report")
+            } catch (e: Exception) {
+                snackbar.showSnackbar("Couldn't make the report: ${e.message ?: e::class.java.simpleName}")
+            } finally {
+                working = false
+            }
+        }
+    }
 
     val selected by vm.selected.collectAsStateWithLifecycle()
     val selecting = selected.isNotEmpty()
@@ -136,23 +155,43 @@ fun HomeScreen(
                     },
                     actions = {
                         TextButton(onClick = vm::selectAll) { Text("All") }
-                        IconButton(onClick = {
-                            scope.launch { shareFile(context, vm.exportSelected(context.cacheDir), "text/csv", "Export receipts") }
-                        }) { Icon(Icons.Default.Share, contentDescription = "Export selected to CSV") }
-                        IconButton(onClick = {
-                            scope.launch {
-                                val n = vm.downloadSelectedPhotos()
-                                snackbar.showSnackbar(
-                                    when (n) {
-                                        0 -> "None of these receipts have a photo."
-                                        1 -> "Saved 1 photo to Pictures/Receipt Vault"
-                                        else -> "Saved $n photos to Pictures/Receipt Vault"
+                        IconButton(onClick = vm::trashSelected) {
+                            Icon(Icons.Default.Delete, contentDescription = "Move selected to trash")
+                        }
+                        Box {
+                            IconButton(onClick = { showMore = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More actions") }
+                            DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Expense report (PDF)") },
+                                    leadingIcon = { Icon(painterResource(R.drawable.ic_report), contentDescription = null) },
+                                    onClick = { showMore = false; makeReport() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Export to CSV") },
+                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                    onClick = {
+                                        showMore = false
+                                        scope.launch { shareFile(context, vm.exportSelected(context.cacheDir), "text/csv", "Export receipts") }
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Download photos") },
+                                    leadingIcon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
+                                    onClick = {
+                                        showMore = false
+                                        scope.launch {
+                                            val n = vm.downloadSelectedPhotos()
+                                            snackbar.showSnackbar(
+                                                when (n) {
+                                                    0 -> "None of these receipts have a photo."
+                                                    1 -> "Saved 1 photo to Pictures/Receipt Vault"
+                                                    else -> "Saved $n photos to Pictures/Receipt Vault"
+                                                },
+                                            )
+                                        }
                                     },
                                 )
                             }
-                        }) { Icon(painterResource(R.drawable.ic_download), contentDescription = "Download photos") }
-                        IconButton(onClick = vm::trashSelected) {
-                            Icon(Icons.Default.Delete, contentDescription = "Move selected to trash")
                         }
                     },
                 )
@@ -160,6 +199,11 @@ fun HomeScreen(
                 TopAppBar(
                     title = { Text("Receipts", fontWeight = FontWeight.SemiBold) },
                     actions = {
+                        if (ui.receipts.isNotEmpty()) {
+                            IconButton(onClick = ::makeReport, enabled = !working) {
+                                Icon(painterResource(R.drawable.ic_report), contentDescription = "Expense report")
+                            }
+                        }
                         IconButton(onClick = onInsights) {
                             Icon(painterResource(R.drawable.ic_insights), contentDescription = "Insights")
                         }
@@ -228,7 +272,7 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = ui.query,
                         onValueChange = vm::setQuery,
-                        placeholder = { Text("Search merchant, item, note, address") },
+                        placeholder = { Text("Search merchant, item, note, tag") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (ui.query.isNotEmpty()) {
@@ -271,6 +315,7 @@ fun HomeScreen(
     if (showFilters) {
         FilterSheet(
             current = ui.filter,
+            tagsInUse = ui.tagsInUse,
             onApply = { vm.setFilter(it); showFilters = false },
             onDismiss = { showFilters = false },
         )
@@ -382,6 +427,7 @@ private fun ReceiptRow(r: Receipt, selected: Boolean, onClick: () -> Unit, onLon
             val extras = listOfNotNull(
                 formatDate(r.purchasedAt),
                 r.tipCents?.takeIf { it > 0 }?.let { "tip ${money(it, r.currency)}" },
+                Tags.decode(r.tags).takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
             )
             Text(extras.joinToString(" · "), maxLines = 1, overflow = TextOverflow.Ellipsis)
         },

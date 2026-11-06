@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -30,6 +31,9 @@ data class Receipt(
     val updatedAt: Long,
     /** Set while the receipt is in the trash (epoch millis); null for normal receipts. */
     val deletedAt: Long? = null,
+    /** Comma-separated labels; see [com.alexivanov.receiptvault.domain.Tags]. */
+    @ColumnInfo(defaultValue = "")
+    val tags: String = "",
 )
 
 @Entity(

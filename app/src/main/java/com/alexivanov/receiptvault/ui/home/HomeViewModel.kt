@@ -7,11 +7,14 @@ import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.CsvExport
+import com.alexivanov.receiptvault.domain.ExpenseReport
+import com.alexivanov.receiptvault.report.PdfReportWriter
 import com.alexivanov.receiptvault.domain.ImageNames
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.ReceiptFilter
 import com.alexivanov.receiptvault.domain.Summary
+import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.update.UpdateController
 import com.alexivanov.receiptvault.update.UpdateState
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +34,8 @@ data class HomeUi(
     val period: Period = Period.THIS_MONTH,
     val query: String = "",
     val filter: ReceiptFilter = ReceiptFilter(),
+    /** Every tag on a receipt, most used first, for the filter sheet. */
+    val tagsInUse: List<String> = emptyList(),
     val receipts: List<Receipt> = emptyList(),
     val summary: Summary? = null,
     val hasAny: Boolean = false,
@@ -73,6 +78,7 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
             period = p,
             query = q,
             filter = f,
+            tagsInUse = Tags.inUse(all.map { it.tags }),
             receipts = filtered,
             summary = Insights.summarize(filtered, settings.defaultCurrency),
             hasAny = all.isNotEmpty(),
@@ -114,6 +120,16 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
         File(dir, "exports").apply { mkdirs() }.resolve("receipts-selected-${LocalDate.now()}.csv").apply { writeText(csv) }
     }
 
+    /** PDF expense report of the selected receipts, or of everything shown when nothing is selected. */
+    suspend fun expenseReport(dir: File): File = withContext(Dispatchers.IO) {
+        val ids = _selected.value
+        val receipts = if (ids.isEmpty()) ui.value.receipts else app.receipts.getByIds(ids.toList())
+        val report = ExpenseReport.build(receipts, LocalDate.now())
+        File(dir, "exports").apply { mkdirs() }.resolve(ExpenseReport.fileName(LocalDate.now())).also { file ->
+            file.outputStream().use { PdfReportWriter().write(report, it) }
+        }
+    }
+
     /** Saves the photos of the selected receipts to Pictures; returns how many were saved. */
     suspend fun downloadSelectedPhotos(): Int {
         var saved = 0
@@ -140,6 +156,7 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
         r.merchant.lowercase().contains(needle) ||
             Category.fromName(r.category).label.lowercase().contains(needle) ||
             r.notes.lowercase().contains(needle) ||
+            r.tags.lowercase().contains(needle) ||
             r.address.orEmpty().lowercase().contains(needle) ||
             r.ocrText.lowercase().contains(needle)
 }

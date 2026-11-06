@@ -68,6 +68,15 @@ class ReceiptFilterTest {
     }
 
     @Test
+    fun `tags keep receipts with any picked tag, ignoring case`() {
+        val tagged = listOf(cafe.copy(tags = "work,Berlin"), shell.copy(tags = "home"), market, bistro.copy(tags = "WORK"))
+        val f = ReceiptFilter(tags = setOf("work"))
+        assertEquals(listOf(1L, 4L), f.apply(tagged, zone).map { it.id })
+        assertEquals(listOf(1L, 2L), ReceiptFilter(tags = setOf("berlin", "home")).apply(tagged, zone).map { it.id })
+        assertEquals(1, f.activeCount)
+    }
+
+    @Test
     fun `filters combine`() {
         val f = ReceiptFilter(
             categories = setOf(Category.DINING),

@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.ui.detail
 
+import com.alexivanov.receiptvault.domain.Tags
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -194,6 +195,11 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
             if (r.notes.isNotBlank()) {
                 SectionTitle("Notes")
                 Text(r.notes)
+            }
+            val tags = Tags.decode(r.tags)
+            if (tags.isNotEmpty()) {
+                SectionTitle("Tags")
+                Text(tags.joinToString("   ") { "#$it" }, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.height(24.dp))
         }

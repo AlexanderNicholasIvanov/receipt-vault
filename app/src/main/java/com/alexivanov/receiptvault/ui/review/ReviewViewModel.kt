@@ -13,8 +13,12 @@ import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.ParsedReceipt
 import com.alexivanov.receiptvault.domain.ReceiptParser
+import com.alexivanov.receiptvault.domain.Tags
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -41,6 +45,8 @@ data class ReceiptDraft(
     val address: String = "",
     val phone: String = "",
     val notes: String = "",
+    /** As typed, comma-separated; cleaned up by [Tags.parse] on save. */
+    val tags: String = "",
     val items: List<ItemDraft> = emptyList(),
 ) {
     /** subtotal - discount + tax + tip, when there is a subtotal to start from. */
@@ -130,6 +136,7 @@ class ReviewViewModel(
                 address = r.address.orEmpty(),
                 phone = r.phone.orEmpty(),
                 notes = r.notes,
+                tags = Tags.display(r.tags),
                 items = items,
             ),
             isNew = false,
@@ -193,6 +200,13 @@ class ReviewViewModel(
 
     // ------------------------------------------------------------------ edits
 
+    /** Tags on other receipts, most used first, offered as one-tap suggestions. */
+    val tagsInUse: StateFlow<List<String>> = app.receipts.receipts
+        .map { all -> Tags.inUse(all.map { it.tags }) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addTag(tag: String) = edit { d -> d.copy(tags = Tags.parse(d.tags + "," + tag).joinToString(", ")) }
+
     fun edit(transform: (ReceiptDraft) -> ReceiptDraft) {
         _state.update { s -> if (s is ReviewState.Editing) s.copy(draft = transform(s.draft), error = null) else s }
     }
@@ -230,6 +244,7 @@ class ReviewViewModel(
             totalCents = total,
             currency = currency,
             notes = d.notes.trim(),
+            tags = Tags.encode(Tags.parse(d.tags)),
             imagePath = imagePath,
             ocrText = ocrText,
             createdAt = existing?.createdAt ?: now,
