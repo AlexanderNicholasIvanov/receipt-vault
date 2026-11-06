@@ -141,6 +141,38 @@ class AppSmokeTest {
         compose.onNodeWithText("Corner Cafe").assertExists()
     }
 
+    @Test
+    fun `reminders and budgets`() {
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Monthly budgets"), 5_000)
+        compose.onNodeWithText("Monthly budgets").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Save budgets"), 5_000)
+        compose.onNodeWithText("Everything").performTextInput("30")
+        compose.onNodeWithText("Save budgets").performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Budgets saved."), 5_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Monthly budgets"), 5_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+
+        // A receipt with a 14-day return window, from today.
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 5_000)
+        compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+        compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+        compose.onNodeWithText("Merchant").performTextInput("Hardware Store")
+        compose.onNodeWithText("Total").performTextInput("25.00")
+        compose.onNodeWithText("14 days").performScrollTo().performClick()
+        compose.onNodeWithText("Return by:", substring = true).assertExists()
+        compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
+
+        compose.waitUntilAtLeastOneExists(hasText("(in 14 days)", substring = true), 10_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("left of", substring = true), 10_000)
+        compose.onNodeWithText("$5.00 left of $30.00 budget").assertExists()
+    }
+
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)

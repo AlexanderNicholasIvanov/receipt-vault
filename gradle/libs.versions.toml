@@ -17,6 +17,7 @@ kotlinxSerialization = "1.9.0"
 coil = "3.6.2"
 exifinterface = "1.4.2"
 datastore = "1.1.7"
+work = "2.12.0"
 mlkitTextRecognition = "16.0.1"
 mlkitDocumentScanner = "16.0.0"
 junit = "4.13.2"
@@ -42,6 +43,8 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
+work-testing = { group = "androidx.work", name = "work-testing", version.ref = "work" }
 exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }

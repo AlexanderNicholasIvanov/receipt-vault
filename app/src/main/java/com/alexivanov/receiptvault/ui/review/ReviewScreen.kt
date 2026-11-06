@@ -1,5 +1,7 @@
 package com.alexivanov.receiptvault.ui.review
 
+import java.time.LocalDate
+import com.alexivanov.receiptvault.ui.rememberNotificationPermissionRequest
 import com.alexivanov.receiptvault.domain.Tags
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -141,6 +143,7 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
     var showImage by remember { mutableStateOf(false) }
+    val askNotifications = rememberNotificationPermissionRequest()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().imePadding(),
@@ -292,6 +295,24 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
             }
         }
 
+        item { SectionTitle("Reminders") }
+        item {
+            ReminderPicker(
+                label = "Return by",
+                value = d.returnBy,
+                presets = listOf("14 days" to d.date.plusDays(14), "30 days" to d.date.plusDays(30)),
+                onChange = { v -> vm.edit { it.copy(returnBy = v) }; if (v != null) askNotifications() },
+            )
+        }
+        item {
+            ReminderPicker(
+                label = "Warranty until",
+                value = d.warrantyUntil,
+                presets = listOf("1 year" to d.date.plusYears(1), "2 years" to d.date.plusYears(2)),
+                onChange = { v -> vm.edit { it.copy(warrantyUntil = v) }; if (v != null) askNotifications() },
+            )
+        }
+
         item { SectionTitle("Notes") }
         item {
             OutlinedTextField(
@@ -369,6 +390,39 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
 
     if (showImage && s.imagePath != null) {
         ZoomableImageDialog(File(s.imagePath)) { showImage = false }
+    }
+}
+
+/** An optional date with one-tap presets, for return and warranty reminders. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderPicker(label: String, value: LocalDate?, presets: List<Pair<String, LocalDate>>, onChange: (LocalDate?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    Column {
+        Text(
+            if (value == null) "$label: not set" else "$label: ${formatDate(value)}",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            presets.forEach { (text, date) ->
+                FilterChip(selected = value == date, onClick = { onChange(date) }, label = { Text(text) })
+            }
+            AssistChip(onClick = { picking = true }, label = { Text("Pick date") })
+            if (value != null) AssistChip(onClick = { onChange(null) }, label = { Text("Clear") })
+        }
+    }
+    if (picking) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = value?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { onChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
+                    picking = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+        ) { DatePicker(state = state) }
     }
 }
 

@@ -2,6 +2,9 @@ package com.alexivanov.receiptvault
 
 import android.app.Application
 import android.content.Context
+import com.alexivanov.receiptvault.alerts.AlertChecker
+import com.alexivanov.receiptvault.alerts.AlertWorker
+import com.alexivanov.receiptvault.alerts.AndroidNotifier
 import com.alexivanov.receiptvault.data.AppDatabase
 import com.alexivanov.receiptvault.data.BackupManager
 import com.alexivanov.receiptvault.data.ReceiptRepository
@@ -23,6 +26,8 @@ class ReceiptVaultApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // WorkManager may be unavailable in some test environments; reminders then run at app start only.
+        runCatching { AlertWorker.schedule(this) }
     }
 }
 
@@ -36,6 +41,7 @@ class AppContainer(context: Context) {
     val settings = SettingsRepository(context)
     val backup = BackupManager(receipts, images, context.cacheDir, BuildConfig.VERSION_NAME)
     val textReader = TextReader(context)
+    val alerts = AlertChecker(receipts, settings, AndroidNotifier(context))
 
     private val apkDownloader = GitHubApkDownloader(context).also { it.clearDownloads() }
 
@@ -48,7 +54,15 @@ class AppContainer(context: Context) {
     )
 
     init {
-        appScope.launch { runCatching { receipts.purgeExpiredTrash() } }
+        appScope.launch {
+            runCatching { receipts.purgeExpiredTrash() }
+            runCatching { alerts.run() }
+        }
+    }
+
+    /** After a receipt or budget changes: a reminder may be due today or a budget just crossed. */
+    fun checkAlertsSoon() {
+        appScope.launch { runCatching { alerts.run() } }
     }
 
     /** Launch-time check, unless the user turned it off in Settings. */

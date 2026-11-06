@@ -51,6 +51,7 @@ import com.alexivanov.receiptvault.domain.CsvExport
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
+import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import com.alexivanov.receiptvault.ui.shareFile
 import com.alexivanov.receiptvault.ui.update.UpdateCard
@@ -63,7 +64,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Unit) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -175,6 +176,24 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit) {
                         },
                     )
                 },
+            )
+            HorizontalDivider()
+
+            Column(Modifier.padding(horizontal = 16.dp)) { SectionTitle("Budgets") }
+            ListItem(
+                headlineContent = { Text("Monthly budgets") },
+                supportingContent = {
+                    val b = settings.budgets
+                    Text(
+                        when {
+                            b.isEmpty -> "Set a monthly limit, overall or per category, and get a heads-up before you go over."
+                            b.monthlyCents != null -> "${money(b.monthlyCents, settings.defaultCurrency)} a month" +
+                                if (b.byCategory.isNotEmpty()) ", plus ${b.byCategory.size} categor${if (b.byCategory.size == 1) "y" else "ies"}" else ""
+                            else -> "${b.byCategory.size} categor${if (b.byCategory.size == 1) "y" else "ies"} with a limit"
+                        },
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onBudgets),
             )
             HorizontalDivider()
 

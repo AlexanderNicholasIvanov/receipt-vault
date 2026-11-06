@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -77,6 +78,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.R
 import com.alexivanov.receiptvault.data.Receipt
+import com.alexivanov.receiptvault.domain.BudgetLevel
+import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.SortOrder
@@ -266,7 +269,7 @@ fun HomeScreen(
                     }
                 }
             }
-            ui.summary?.let { s -> item { SummaryCard(s) } }
+            ui.summary?.let { s -> item { SummaryCard(s, ui.budget) } }
             if (ui.hasAny) {
                 item {
                     OutlinedTextField(
@@ -356,7 +359,7 @@ private fun SheetOption(icon: androidx.compose.ui.graphics.painter.Painter, titl
 }
 
 @Composable
-private fun SummaryCard(s: Summary) {
+private fun SummaryCard(s: Summary, budget: BudgetUse?) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -374,6 +377,25 @@ private fun SummaryCard(s: Summary) {
                 Stat("Receipts", s.count.toString())
                 Stat("Tips", money(s.tipCents, s.currency))
                 Stat("Tax", money(s.taxCents, s.currency))
+            }
+            if (budget != null) {
+                Spacer(Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    progress = { budget.fraction },
+                    color = if (budget.level == BudgetLevel.OVER) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(4.dp))
+                val left = budget.budgetCents - budget.spentCents
+                Text(
+                    if (left >= 0) {
+                        "${money(left, s.currency)} left of ${money(budget.budgetCents, s.currency)} budget"
+                    } else {
+                        "${money(-left, s.currency)} over the ${money(budget.budgetCents, s.currency)} budget"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
             if (s.otherCurrencyCount > 0) {
                 Spacer(Modifier.height(8.dp))

@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.alexivanov.receiptvault.ui.budgets.BudgetScreen
 import com.alexivanov.receiptvault.ui.detail.DetailScreen
 import com.alexivanov.receiptvault.ui.home.HomeScreen
 import com.alexivanov.receiptvault.ui.insights.InsightsScreen
@@ -17,6 +18,7 @@ import com.alexivanov.receiptvault.ui.review.ReviewScreen
 import com.alexivanov.receiptvault.ui.settings.SettingsScreen
 import com.alexivanov.receiptvault.ui.trash.TrashScreen
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 private object Routes {
     const val HOME = "home"
@@ -25,6 +27,7 @@ private object Routes {
     const val INSIGHTS = "insights"
     const val SETTINGS = "settings"
     const val TRASH = "trash"
+    const val BUDGETS = "budgets"
 
     fun review(uri: Uri? = null, source: CaptureSource = CaptureSource.MANUAL, id: Long? = null): String =
         "review?uri=${Uri.encode(uri?.toString().orEmpty())}&source=${source.name}&id=${id ?: ""}"
@@ -36,9 +39,12 @@ private object Routes {
  * @param sharedImages photos shared into the app from Gallery or elsewhere.
  */
 @Composable
-fun AppNav(sharedImages: Flow<Uri>, nav: NavHostController = rememberNavController()) {
+fun AppNav(sharedImages: Flow<Uri>, openReceipts: Flow<Long> = emptyFlow(), nav: NavHostController = rememberNavController()) {
     LaunchedEffect(sharedImages) {
         sharedImages.collect { uri -> nav.navigate(Routes.review(uri, CaptureSource.SHARED)) }
+    }
+    LaunchedEffect(openReceipts) {
+        openReceipts.collect { id -> nav.navigate(Routes.detail(id)) { launchSingleTop = true } }
     }
 
     NavHost(navController = nav, startDestination = Routes.HOME) {
@@ -73,7 +79,10 @@ fun AppNav(sharedImages: Flow<Uri>, nav: NavHostController = rememberNavControll
             DetailScreen(id = id, onBack = { nav.popBackStack() }, onEdit = { nav.navigate(Routes.review(id = it)) })
         }
         composable(Routes.INSIGHTS) { InsightsScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }, onTrash = { nav.navigate(Routes.TRASH) }) }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = { nav.popBackStack() }, onTrash = { nav.navigate(Routes.TRASH) }, onBudgets = { nav.navigate(Routes.BUDGETS) })
+        }
+        composable(Routes.BUDGETS) { BudgetScreen(onBack = { nav.popBackStack() }) }
         composable(Routes.TRASH) { TrashScreen(onBack = { nav.popBackStack() }) }
     }
 }

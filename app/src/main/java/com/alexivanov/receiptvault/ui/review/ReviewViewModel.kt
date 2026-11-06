@@ -47,6 +47,8 @@ data class ReceiptDraft(
     val notes: String = "",
     /** As typed, comma-separated; cleaned up by [Tags.parse] on save. */
     val tags: String = "",
+    val returnBy: LocalDate? = null,
+    val warrantyUntil: LocalDate? = null,
     val items: List<ItemDraft> = emptyList(),
 ) {
     /** subtotal - discount + tax + tip, when there is a subtotal to start from. */
@@ -137,6 +139,8 @@ class ReviewViewModel(
                 phone = r.phone.orEmpty(),
                 notes = r.notes,
                 tags = Tags.display(r.tags),
+                returnBy = r.returnBy?.let(LocalDate::ofEpochDay),
+                warrantyUntil = r.warrantyUntil?.let(LocalDate::ofEpochDay),
                 items = items,
             ),
             isNew = false,
@@ -245,6 +249,8 @@ class ReviewViewModel(
             currency = currency,
             notes = d.notes.trim(),
             tags = Tags.encode(Tags.parse(d.tags)),
+            returnBy = d.returnBy?.toEpochDay(),
+            warrantyUntil = d.warrantyUntil?.toEpochDay(),
             imagePath = imagePath,
             ocrText = ocrText,
             createdAt = existing?.createdAt ?: now,
@@ -257,6 +263,7 @@ class ReviewViewModel(
         }
         viewModelScope.launch {
             _saved.value = app.receipts.save(receipt, items)
+            app.checkAlertsSoon()
         }
     }
 

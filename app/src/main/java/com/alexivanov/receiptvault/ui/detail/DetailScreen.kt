@@ -1,5 +1,8 @@
 package com.alexivanov.receiptvault.ui.detail
 
+import com.alexivanov.receiptvault.ui.formatDate
+import java.time.LocalDate
+import com.alexivanov.receiptvault.domain.Reminders
 import com.alexivanov.receiptvault.domain.Tags
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -189,6 +192,25 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                             AmountRow(if (item.quantity > 1) "${item.quantity} × ${item.name}" else item.name, money(item.priceCents, r.currency))
                         }
                     }
+                }
+            }
+
+            val today = LocalDate.now()
+            val reminders = listOfNotNull(
+                r.returnBy?.let { "Return by" to LocalDate.ofEpochDay(it) },
+                r.warrantyUntil?.let { "Warranty until" to LocalDate.ofEpochDay(it) },
+            )
+            if (reminders.isNotEmpty()) {
+                SectionTitle("Reminders")
+                reminders.forEach { (label, date) ->
+                    val days = Reminders.daysLeft(date, today)
+                    val left = when {
+                        days < 0 -> "ended"
+                        days == 0L -> "today"
+                        days == 1L -> "tomorrow"
+                        else -> "in $days days"
+                    }
+                    AmountRow(label, "${formatDate(date)} ($left)")
                 }
             }
 
