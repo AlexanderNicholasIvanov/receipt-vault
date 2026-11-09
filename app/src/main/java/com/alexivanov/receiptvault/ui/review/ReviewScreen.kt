@@ -1,5 +1,7 @@
 package com.alexivanov.receiptvault.ui.review
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.DisposableEffect
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import java.time.LocalDate
 import com.alexivanov.receiptvault.ui.rememberNotificationPermissionRequest
@@ -86,7 +88,7 @@ import java.time.format.FormatStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewScreen(onBack: () -> Unit, onSaved: (Long) -> Unit) {
+fun ReviewScreen(onBack: () -> Unit, onSaved: (Long) -> Unit, onUnsavedWork: (Boolean) -> Unit = {}) {
     val vm = appViewModel { app, handle -> ReviewViewModel(app, handle) }
     val state by vm.state.collectAsStateWithLifecycle()
     val saved by vm.saved.collectAsStateWithLifecycle()
@@ -94,12 +96,31 @@ fun ReviewScreen(onBack: () -> Unit, onSaved: (Long) -> Unit) {
     LaunchedEffect(saved) { saved?.let(onSaved) }
 
     val editing = state as? ReviewState.Editing
+    val unsaved = editing?.hasUnsavedWork == true
+    DisposableEffect(unsaved) {
+        onUnsavedWork(unsaved)
+        onDispose { onUnsavedWork(false) }
+    }
+    var confirmDiscard by remember { mutableStateOf(false) }
+    BackHandler(enabled = unsaved) { confirmDiscard = true }
+    if (confirmDiscard && !LocalAppLocked.current) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("Discard this receipt?") },
+            text = { Text(if (editing?.isNew == false) "Your changes won't be saved." else "The photo and details won't be saved.") },
+            confirmButton = { TextButton(onClick = onBack) { Text("Discard") } },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (editing?.isNew == false) "Edit receipt" else "New receipt") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = { if (unsaved) confirmDiscard = true else onBack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 },
                 actions = {
                     if (editing != null) {

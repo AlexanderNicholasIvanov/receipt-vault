@@ -42,6 +42,34 @@ class QuickCaptureFlowTest {
     }
 
     @Test
+    fun `Back on an unsaved receipt asks first, Back on an untouched one just leaves`() {
+        ActivityScenario.launch<MainActivity>(QuickCapture.intent(context, QuickAction.MANUAL)).use { scenario ->
+            fun pressBack() = scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.onNodeWithText("Merchant").performTextInput("Half typed")
+            compose.waitForIdle()
+
+            pressBack()
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 5_000)
+            compose.onNodeWithText("Keep editing").performClick()
+            compose.onNodeWithText("Half typed").assertExists()
+
+            pressBack()
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 5_000)
+            compose.onNodeWithText("Discard").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+
+            compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            pressBack()
+            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.onNodeWithText("Discard this receipt?").assertDoesNotExist()
+        }
+    }
+
+    @Test
     fun `the Scan shortcut starts the scanner from Home`() {
         ActivityScenario.launch<MainActivity>(QuickCapture.intent(context, QuickAction.SCAN)).use {
             // No Google Play services here, so the scanner falls back to the camera, which says so.
@@ -50,7 +78,7 @@ class QuickCaptureFlowTest {
     }
 
     @Test
-    fun `a shortcut tapped while the app is open goes back to Home first`() {
+    fun `a shortcut tapped during an unsaved receipt asks before discarding it`() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
@@ -58,8 +86,19 @@ class QuickCaptureFlowTest {
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
             compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
             compose.onNodeWithText("Merchant").performTextInput("Half typed")
+            compose.waitForIdle()
 
-            scenario.onActivity { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, QuickCapture.intent(context, QuickAction.MANUAL)) }
+            fun tapShortcut() = scenario.onActivity { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, QuickCapture.intent(context, QuickAction.MANUAL)) }
+
+            tapShortcut()
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 10_000)
+            compose.onNodeWithText("Keep editing").performClick()
+            compose.waitUntilDoesNotExist(hasText("Discard this receipt?"), 5_000)
+            compose.onNodeWithText("Half typed").assertExists()
+
+            tapShortcut()
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 10_000)
+            compose.onNodeWithText("Discard").performClick()
             compose.waitUntilDoesNotExist(hasText("Half typed"), 10_000)
             compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
         }

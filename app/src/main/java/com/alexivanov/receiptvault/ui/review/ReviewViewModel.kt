@@ -86,7 +86,12 @@ sealed interface ReviewState {
         val error: String? = null,
         /** A saved receipt this one looks like; the screen asks before saving a second copy. */
         val duplicateOf: Receipt? = null,
-    ) : ReviewState
+        /** The form as it first opened; null for one resumed after Android closed the app. */
+        val original: ReceiptDraft? = null,
+    ) : ReviewState {
+        /** Leaving now would lose something: typed changes, or a new photo that exists nowhere else. */
+        val hasUnsavedWork: Boolean get() = draft != original || (isNew && imagePath != null)
+    }
     data class Failed(val message: String) : ReviewState
 }
 
@@ -172,11 +177,15 @@ class ReviewViewModel(
             isNew = false,
             imagePath = r.imagePath,
         )
+        if (resumed == null) markOriginal()
     }
+
+    private fun markOriginal() = _state.update { s -> if (s is ReviewState.Editing) s.copy(original = s.draft) else s }
 
     private suspend fun startManual() {
         val settings = app.settings.current()
         _state.value = ReviewState.Editing(ReceiptDraft(currency = settings.defaultCurrency), isNew = true, imagePath = null)
+        markOriginal()
     }
 
     private suspend fun processPhoto(uris: List<Uri>) {
@@ -238,6 +247,7 @@ class ReviewViewModel(
             imagePath = imagePath,
             notice = notice,
         )
+        markOriginal()
     }
 
     /** Stacks the pages into one photo; if that fails (very long scans on a small phone), keeps the first page. */
