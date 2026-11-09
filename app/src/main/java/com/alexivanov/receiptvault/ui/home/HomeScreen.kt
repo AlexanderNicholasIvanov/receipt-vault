@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.shareFile
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
@@ -168,7 +169,7 @@ fun HomeScreen(
                         }
                         Box {
                             IconButton(onClick = { showMore = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More actions") }
-                            DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                            DropdownMenu(expanded = showMore && !LocalAppLocked.current, onDismissRequest = { showMore = false }) {
                                 DropdownMenuItem(
                                     text = { Text("Expense report (PDF)") },
                                     leadingIcon = { Icon(painterResource(R.drawable.ic_report), contentDescription = null) },
@@ -329,7 +330,7 @@ fun HomeScreen(
         )
     }
 
-    if (showSheet) {
+    if (showSheet && !LocalAppLocked.current) {
         ModalBottomSheet(onDismissRequest = { showSheet = false }) {
             Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
                 Text("Add a receipt", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))

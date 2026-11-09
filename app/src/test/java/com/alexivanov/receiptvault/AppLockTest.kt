@@ -5,6 +5,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import android.os.Looper
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
@@ -101,5 +103,43 @@ class AppLockTest {
         assertEquals(200_000L, AppLockSession.backgroundedAt)
         AppLockSession.activityStarted(enabled = true, now = 200_000 + AppLockPolicy.GRACE_MILLIS)
         assertFalse(AppLockSession.unlocked)
+    }
+
+    @Test
+    fun `a popup is hidden while locked and comes back after unlocking`() {
+        AppLockSession.unlocked = true
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+
+            compose.runOnUiThread { AppLockSession.unlocked = false }
+            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), 5_000)
+            compose.waitUntilDoesNotExist(hasText("Enter manually"), 5_000)
+
+            compose.runOnUiThread { AppLockSession.unlocked = true }
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+        }
+    }
+
+    @Test
+    fun `back on the lock screen leaves the hidden screens alone`() {
+        AppLockSession.unlocked = true
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.onNodeWithText("Merchant").performTextInput("Half typed")
+
+            compose.runOnUiThread { AppLockSession.unlocked = false }
+            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), 5_000)
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            compose.waitForIdle()
+
+            compose.runOnUiThread { AppLockSession.unlocked = true }
+            compose.waitUntilAtLeastOneExists(hasText("Half typed"), 5_000)
+        }
     }
 }

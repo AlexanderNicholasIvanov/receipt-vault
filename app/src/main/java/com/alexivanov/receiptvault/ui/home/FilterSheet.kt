@@ -38,6 +38,7 @@ import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.ReceiptFilter
 import com.alexivanov.receiptvault.domain.SortOrder
 import com.alexivanov.receiptvault.ui.formatDate
+import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -55,6 +56,9 @@ fun FilterSheet(current: ReceiptFilter, tagsInUse: List<String>, onApply: (Recei
     var from by remember { mutableStateOf(current.from) }
     var to by remember { mutableStateOf(current.to) }
     var pickDates by remember { mutableStateOf(false) }
+
+    // The choices above are kept, so the sheet comes back as it was after unlocking.
+    if (LocalAppLocked.current) return
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(

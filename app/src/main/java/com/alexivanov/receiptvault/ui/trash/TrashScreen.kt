@@ -37,6 +37,7 @@ import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.formatDate
+import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.money
 import kotlinx.coroutines.launch
 
@@ -110,7 +111,7 @@ fun TrashScreen(onBack: () -> Unit) {
         }
     }
 
-    confirm?.let { doomed ->
+    confirm?.takeUnless { LocalAppLocked.current }?.let { doomed ->
         AlertDialog(
             onDismissRequest = { confirm = null },
             title = { Text(if (doomed.size == 1) "Delete forever?" else "Empty trash?") },

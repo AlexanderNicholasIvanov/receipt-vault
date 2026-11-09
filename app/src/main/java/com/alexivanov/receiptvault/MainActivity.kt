@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,6 +22,7 @@ import com.alexivanov.receiptvault.capture.QuickAction
 import com.alexivanov.receiptvault.domain.AppLockPolicy
 import com.alexivanov.receiptvault.scan.PdfPages
 import com.alexivanov.receiptvault.ui.AppNav
+import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.lock.LockScreen
 import com.alexivanov.receiptvault.ui.theme.ReceiptVaultTheme
 import kotlinx.coroutines.Dispatchers
@@ -71,11 +73,13 @@ class MainActivity : ComponentActivity() {
                     // Stays composed while locked so results from the camera or a file picker
                     // still arrive; it's hidden from the screen and from accessibility services.
                     Box(if (locked) Modifier.fillMaxSize().clearAndSetSemantics { } else Modifier.fillMaxSize()) {
-                        AppNav(
-                            sharedImages = shared.receiveAsFlow(),
-                            openReceipts = openReceipts.receiveAsFlow(),
-                            quickActions = quickActions.receiveAsFlow(),
-                        )
+                        CompositionLocalProvider(LocalAppLocked provides locked) {
+                            AppNav(
+                                sharedImages = shared.receiveAsFlow(),
+                                openReceipts = openReceipts.receiveAsFlow(),
+                                quickActions = quickActions.receiveAsFlow(),
+                            )
+                        }
                     }
                     if (locked) {
                         LockScreen(onUnlocked = { AppLockSession.unlocked = true })
