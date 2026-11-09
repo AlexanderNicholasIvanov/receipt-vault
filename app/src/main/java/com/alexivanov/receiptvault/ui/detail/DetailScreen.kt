@@ -1,5 +1,7 @@
 package com.alexivanov.receiptvault.ui.detail
 
+import androidx.compose.foundation.layout.Box
+import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import java.time.LocalDate
@@ -71,15 +73,20 @@ import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import com.alexivanov.receiptvault.ui.review.ZoomableImageDialog
 import com.alexivanov.receiptvault.ui.shareFile
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
+
+private data class Loaded(val receipt: Receipt?)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
-    val receipt by remember(id) { app.receipts.receipt(id) }.collectAsStateWithLifecycle(initialValue = null)
+    // Wrapped so that "still loading" (null) differs from "doesn't exist any more" (Loaded(null)).
+    val loaded by remember(id) { app.receipts.receipt(id).map { Loaded(it) } }.collectAsStateWithLifecycle(initialValue = null)
+    val receipt = loaded?.receipt
     val items by remember(id) { app.receipts.items(id) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     var showImage by remember { mutableStateOf(false) }
@@ -97,24 +104,44 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                     val r = receipt
                     if (r != null) {
                         IconButton(onClick = { share(context, r, items) }) { Icon(Icons.Default.Share, contentDescription = "Share") }
-                        IconButton(onClick = { onEdit(r.id) }) { Icon(Icons.Default.Edit, contentDescription = "Edit") }
-                        IconButton(onClick = {
-                            // Undo is offered on the home screen; the trash keeps it for 30 days.
-                            // App scope, so leaving this screen can't cancel the write.
-                            app.appScope.launch { app.receipts.moveToTrash(listOf(r.id)) }
-                            onBack()
-                        }) { Icon(Icons.Default.Delete, contentDescription = "Move to trash") }
+                        if (r.deletedAt == null) {
+                            IconButton(onClick = { onEdit(r.id) }) { Icon(Icons.Default.Edit, contentDescription = "Edit") }
+                            IconButton(onClick = {
+                                // Undo is offered on the home screen; the trash keeps it for 30 days.
+                                // App scope, so leaving this screen can't cancel the write.
+                                app.appScope.launch { app.receipts.moveToTrash(listOf(r.id)) }
+                                onBack()
+                            }) { Icon(Icons.Default.Delete, contentDescription = "Move to trash") }
+                        }
                     }
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (loaded != null && receipt == null) {
+            // A reminder can outlive its receipt: emptied from the trash, or removed after 30 days.
+            Box(Modifier.padding(padding).fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text("This receipt no longer exists.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         val r = receipt ?: return@Scaffold
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            r.deletedAt?.let { deletedAt ->
+                val days = TrashPolicy.daysLeft(deletedAt, System.currentTimeMillis())
+                Card(Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (days <= 1) "In the trash · deleted tomorrow" else "In the trash · $days days left",
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { app.appScope.launch { app.receipts.restoreFromTrash(listOf(r.id)) } }) { Text("Restore") }
+                    }
+                }
+            }
             r.imagePath?.let { path ->
                 AsyncImage(
                     model = File(path),
