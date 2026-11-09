@@ -80,27 +80,31 @@ object ReceiptParser {
 
     // ---------------------------------------------------------------- classification
 
-    private val SUBTOTAL_RE = Regex("""\bsub\s*-?\s*tota?l\b|\bsubtotal\b|\bnet\s+(amount|total|sales)\b|\b(pre-?tax|before\s+tax)\b|\bmerchandise\s+total\b|\bfood\s*(&|and)?\s*bev\w*\s+total\b|\bitems?\s+total\b""")
-    private val TAX_RE = Regex("""\b(tax|taxes|vat|gst|hst|pst|qst|iva|mwst)\b""")
+    private val SUBTOTAL_RE = Regex("""\bsub\s*-?\s*tota?l\b|\bsubtotal\b|\bnet\s+(amount|total|sales)\b|\b(pre-?tax|before\s+tax)\b|\bmerchandise\s+total\b|\bfood\s*(&|and)?\s*bev\w*\s+total\b|\bitems?\s+total\b|\bzwischensumme\b|\bsous\s*-?\s*total\b|\bsubtotale\b|\bsubtotaal\b""")
+    private val TAX_RE = Regex("""\b(tax|taxes|vat|gst|hst|pst|qst|iva|mwst|ust|tva|btw)\b""")
     private val TAX_INCLUDED_RE = Regex("""\b(incl\.?|including|inc\.?|w/)\s*(sales\s+)?(tax|vat|gst)\b""")
     private val TIP_RE = Regex("""\b(tip|tips|gratuity|grat)\b""")
     private val TIP_GUIDE_RE = Regex("""\b(suggest\w*|tip\s+guide|guide|for\s+your\s+convenience|tip\s+calculat\w*)\b""")
     private val DISCOUNT_RE = Regex("""\b(discount|savings|coupon|you\s+saved|promo\w*|markdown|rebate)\b|%\s*off\b""")
-    private val TOTAL_RE = Regex("""\b(grand\s+total|total|amount\s+due|balance\s+due|total\s+due|amount\s+paid|to\s+pay|amt\s+due|total\s+amount|amount|balance|sale\s+amount|purchase)\b""")
+    private val TOTAL_RE = Regex("""\b(grand\s+total|total|amount\s+due|balance\s+due|total\s+due|amount\s+paid|to\s+pay|amt\s+due|total\s+amount|amount|balance|sale\s+amount|purchase|summe|gesamt|gesamtsumme|gesamtbetrag|endsumme|endbetrag|betrag|zu\s+zahlen|totale|importo|da\s+pagare|importe|a\s+pagar|montant|payer|totaal|te\s+betalen)\b""")
     private val TOTAL_EXCLUDE_RE = Regex("""\b(total\s+(savings|saved|items?|qty|quantity|units|points|discounts?|number)|items?\s+sold|#\s*of\s+items|points|rewards?)\b""")
-    private val TENDER_RE = Regex("""\b(cash|change|tendered|tend|change\s+due|payment|paid|visa|mastercard|master\s*card|amex|american\s+express|discover|debit|credit|card)\b""")
+    private val TENDER_RE = Regex("""\b(cash|change|tendered|tend|change\s+due|payment|paid|visa|mastercard|master\s*card|amex|american\s+express|discover|debit|credit|card|gegeben|geg\.?\s*bar|bargeld|r(?:ue|ü|u)ckgeld|wechselgeld|contanti|efectivo|esp[eè]ces|wisselgeld|kartenzahlung|girocard)\b""")
+
+    // Cash and change in words that also mean ordinary things ("Chocolate Bar"), so only when they are the whole label.
+    private val BARE_TENDER_RE = Regex("""^\W*(bar|resto|cambio|rendu|contant)\W*(eur|chf)?\W*$""")
 
     private fun classify(rows: List<ReceiptRow>): List<Row> {
         var tipGuideUntil = -1
         return rows.mapIndexed { i, r ->
             val lower = r.text.lowercase()
-            val amounts = Money.findAll(r.text)
+            val kind = kindOf(lower)
+            val amounts = Money.findAll(r.text, spacedThousands = kind != Kind.NONE)
             if (TIP_GUIDE_RE.containsMatchIn(lower) && (TIP_RE.containsMatchIn(lower) || lower.contains('%'))) {
                 tipGuideUntil = i + 6
             }
             // Suggested-tip tables: "18% = $8.10  Total $53.10". Any percent row inside one is noise.
             val inGuide = i <= tipGuideUntil && (lower.contains('%') || TIP_GUIDE_RE.containsMatchIn(lower))
-            Row(i, r.text, lower, r.height, amounts, kindOf(lower), inGuide)
+            Row(i, r.text, lower, r.height, amounts, kind, inGuide)
         }
     }
 
@@ -114,7 +118,7 @@ object ReceiptParser {
             DISCOUNT_RE.containsMatchIn(label) -> Kind.DISCOUNT
             TOTAL_RE.containsMatchIn(label) && !TOTAL_EXCLUDE_RE.containsMatchIn(label) &&
                 !Regex("""\b(cash|change|tendered)\b""").containsMatchIn(label) -> Kind.TOTAL
-            TENDER_RE.containsMatchIn(label) -> Kind.TENDER
+            TENDER_RE.containsMatchIn(label) || BARE_TENDER_RE.containsMatchIn(label) -> Kind.TENDER
             else -> Kind.NONE
         }
     }
