@@ -60,7 +60,10 @@ android {
             // Every One UI 8 phone is 64-bit ARM. Dropping the other ABIs' copies of the
             // ML Kit OCR native library roughly quarters the download.
             ndk { abiFilters += "arm64-v8a" }
-            signingConfig = if (releaseKeystore != null) {
+            // CI builds without the key and signs afterwards, in a job that runs none of the build.
+            signingConfig = if (providers.gradleProperty("receiptvault.unsignedRelease").isPresent) {
+                null
+            } else if (releaseKeystore != null) {
                 signingConfigs.getByName("release")
             } else {
                 logger.warn("ReceiptVault: RV_KEYSTORE_PATH unset; release APK will be DEBUG-SIGNED.")
