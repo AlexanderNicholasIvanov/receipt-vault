@@ -1,6 +1,7 @@
 package com.alexivanov.receiptvault.ui.detail
 
 import com.alexivanov.receiptvault.ui.formatDate
+import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import java.time.LocalDate
 import com.alexivanov.receiptvault.domain.Reminders
 import com.alexivanov.receiptvault.domain.Tags
@@ -226,7 +227,7 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
             Spacer(Modifier.height(24.dp))
         }
 
-        if (showImage && r.imagePath != null) ZoomableImageDialog(File(r.imagePath)) { showImage = false }
+        if (showImage && r.imagePath != null && !LocalAppLocked.current) ZoomableImageDialog(File(r.imagePath)) { showImage = false }
 
     }
 }

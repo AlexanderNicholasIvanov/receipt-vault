@@ -6,6 +6,8 @@ import android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEA
 import android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import android.hardware.biometrics.BiometricPrompt
 import android.os.CancellationSignal
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +73,12 @@ object Authenticator {
 }
 
 /**
+ * True while the lock screen is up. Dialogs, sheets and menus are separate windows that
+ * would sit on top of it, so they check this and stay away until the app is unlocked.
+ */
+val LocalAppLocked = compositionLocalOf { false }
+
+/**
  * Covers the app while it's locked. The app keeps running underneath (so a
  * camera or file-picker result isn't lost), but nothing of it is visible or
  * readable by accessibility services until unlocked.
@@ -82,6 +91,10 @@ fun LockScreen(onUnlocked: () -> Unit) {
         if (ok) onUnlocked() else message = msg
     }
     LaunchedEffect(Unit) { prompt() }
+
+    // Back would otherwise reach the hidden screens and close them unseen.
+    val activity = LocalActivity.current
+    BackHandler { activity?.moveTaskToBack(true) }
 
     Column(
         Modifier

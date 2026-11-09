@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.ui.review
 
+import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import java.time.LocalDate
 import com.alexivanov.receiptvault.ui.rememberNotificationPermissionRequest
 import com.alexivanov.receiptvault.domain.Tags
@@ -349,7 +350,8 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
         }
     }
 
-    if (showDate) {
+    val locked = LocalAppLocked.current
+    if (showDate && !locked) {
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = d.date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         )
@@ -368,7 +370,7 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
         ) { DatePicker(state = pickerState) }
     }
 
-    if (showTime) {
+    if (showTime && !locked) {
         val initial = d.time ?: LocalTime.now()
         val timeState = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute)
         AlertDialog(
@@ -389,11 +391,11 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
         )
     }
 
-    if (showImage && s.imagePath != null) {
+    if (showImage && s.imagePath != null && !locked) {
         ZoomableImageDialog(File(s.imagePath)) { showImage = false }
     }
 
-    s.duplicateOf?.let { twin ->
+    s.duplicateOf?.takeUnless { locked }?.let { twin ->
         val day = Instant.ofEpochMilli(twin.purchasedAt).atZone(ZoneId.systemDefault()).toLocalDate()
         AlertDialog(
             onDismissRequest = vm::dismissDuplicate,
@@ -428,7 +430,7 @@ private fun ReminderPicker(label: String, value: LocalDate?, presets: List<Pair<
             if (value != null) AssistChip(onClick = { onChange(null) }, label = { Text("Clear") })
         }
     }
-    if (picking) {
+    if (picking && !LocalAppLocked.current) {
         val state = rememberDatePickerState(initialSelectedDateMillis = value?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())
         DatePickerDialog(
             onDismissRequest = { picking = false },
