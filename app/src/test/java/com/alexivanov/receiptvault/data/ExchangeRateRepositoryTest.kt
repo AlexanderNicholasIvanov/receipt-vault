@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.data
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,8 +20,10 @@ import java.io.IOException
 import java.math.BigDecimal
 import java.time.LocalDate
 
+// A plain Application: ReceiptVaultApp watches the same setting and would download real rates
+// into the shared settings file, racing the fake source below.
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [36])
+@Config(sdk = [36], application = Application::class)
 class ExchangeRateRepositoryTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
