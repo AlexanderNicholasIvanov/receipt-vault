@@ -93,3 +93,19 @@ object BackupFormat {
 
     fun fileName(date: LocalDate): String = "ReceiptVault-backup-$date.zip"
 }
+
+/**
+ * What a restore can skip. Counted, not a set: two identical lunches on the same day are
+ * two receipts, so each copy on the phone only accounts for one copy in the backup.
+ */
+class ReceiptsOnPhone(keys: Iterable<String>) {
+    private val remaining = keys.groupingBy { it }.eachCount().toMutableMap()
+
+    /** @return true when a receipt on the phone already covers this one. */
+    fun claim(key: String): Boolean {
+        val left = remaining[key] ?: 0
+        if (left == 0) return false
+        remaining[key] = left - 1
+        return true
+    }
+}

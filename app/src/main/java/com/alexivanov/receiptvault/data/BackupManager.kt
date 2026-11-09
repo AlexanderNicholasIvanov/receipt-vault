@@ -2,6 +2,7 @@ package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.domain.BackupException
 import com.alexivanov.receiptvault.domain.BackupFormat
+import com.alexivanov.receiptvault.domain.ReceiptsOnPhone
 import com.alexivanov.receiptvault.domain.BackupItem
 import com.alexivanov.receiptvault.domain.BackupManifest
 import com.alexivanov.receiptvault.domain.BackupReceipt
@@ -95,14 +96,13 @@ class BackupManager(
             )
 
             // Compare with the trash too: a trashed receipt is still on this phone.
-            val existing = receipts.getEverything().mapTo(HashSet()) {
-                BackupFormat.sameReceiptKey(it.merchant, it.purchasedAt, it.totalCents, it.currency)
-            }
+            val existing = ReceiptsOnPhone(
+                receipts.getEverything().map { BackupFormat.sameReceiptKey(it.merchant, it.purchasedAt, it.totalCents, it.currency) },
+            )
             var added = 0
             var skipped = 0
             for (b in manifest.receipts) {
-                val key = BackupFormat.sameReceiptKey(b.merchant, b.purchasedAt, b.totalCents, b.currency)
-                if (!existing.add(key)) {
+                if (existing.claim(BackupFormat.sameReceiptKey(b.merchant, b.purchasedAt, b.totalCents, b.currency))) {
                     skipped++
                     continue
                 }

@@ -90,6 +90,34 @@ class BackupManagerTest {
     }
 
     @Test
+    fun `two identical receipts in a backup both come back`() = runBlocking {
+        val (oldPhone, oldBackup) = freshPhone()
+        oldPhone.save(receipt("Corner Cafe", 1250), emptyList())
+        oldPhone.save(receipt("Corner Cafe", 1250), emptyList())
+        val zip = ByteArrayOutputStream().also { assertEquals(2, oldBackup.export(it)) }.toByteArray()
+
+        val (newPhone, newBackup) = freshPhone()
+        assertEquals(RestoreResult(added = 2, skipped = 0), newBackup.restore(ByteArrayInputStream(zip)))
+        assertEquals(2, newPhone.getAll().size)
+
+        assertEquals("restoring again still adds nothing", RestoreResult(added = 0, skipped = 2), newBackup.restore(ByteArrayInputStream(zip)))
+        assertEquals(2, newPhone.getAll().size)
+    }
+
+    @Test
+    fun `a phone with one of two identical receipts gets only the missing one`() = runBlocking {
+        val (oldPhone, oldBackup) = freshPhone()
+        oldPhone.save(receipt("Corner Cafe", 1250), emptyList())
+        oldPhone.save(receipt("Corner Cafe", 1250), emptyList())
+        val zip = ByteArrayOutputStream().also { oldBackup.export(it) }.toByteArray()
+
+        val (newPhone, newBackup) = freshPhone()
+        newPhone.save(receipt("Corner Cafe", 1250), emptyList())
+        assertEquals(RestoreResult(added = 1, skipped = 1), newBackup.restore(ByteArrayInputStream(zip)))
+        assertEquals(2, newPhone.getAll().size)
+    }
+
+    @Test
     fun `files that are not backups are rejected with a readable message`() = runBlocking {
         val (_, backup) = freshPhone()
         val notZip = runCatching { backup.restore(ByteArrayInputStream("hello".toByteArray())) }.exceptionOrNull()
