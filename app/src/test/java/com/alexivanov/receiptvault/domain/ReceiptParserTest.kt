@@ -212,4 +212,61 @@ class ReceiptParserTest {
         assertEquals(listOf("TAX  0.42", "TOTAL  $13.18"), rows.map { it.text })
         assertEquals(1318L, ReceiptParser.parse(rows, today).totalCents)
     }
+
+    @Test
+    fun `German supermarket receipt reads Summe as the total, not the cash handed over`() {
+        val text = """
+            REWE Markt GmbH
+            Hauptstrasse 5
+            MILCH 1,19
+            BROT 2,49
+            KAFFEE 11,29
+            ZWISCHENSUMME 14,97
+            SUMME EUR 14,97
+            Geg. BAR EUR 20,00
+            Rueckgeld EUR 5,03
+            MwSt 19% 2,39
+        """.trimIndent()
+
+        val r = ReceiptParser.parseText(text, today)
+
+        assertEquals(1497L, r.subtotalCents)
+        assertEquals(1497L, r.totalCents)
+        assertEquals(239L, r.taxCents)
+        assertEquals(listOf("Milch", "Brot", "Kaffee"), r.items.map { it.name })
+    }
+
+    @Test
+    fun `Italian, Dutch and Spanish total labels`() {
+        assertEquals(2350L, ReceiptParser.parseText("Bar Roma\nCaffe 3,50\nTOTALE 23,50\nContanti 50,00\nResto 26,50", today).totalCents)
+        assertEquals(1820L, ReceiptParser.parseText("Bakker\nBrood 2,20\nTOTAAL 18,20\nContant 20,00\nWisselgeld 1,80", today).totalCents)
+        assertEquals(960L, ReceiptParser.parseText("Tienda\nPan 1,20\nIMPORTE 9,60\nEfectivo 10,00\nCambio 0,40", today).totalCents)
+    }
+
+    @Test
+    fun `a chocolate bar is still an item`() {
+        val r = ReceiptParser.parseText("Kiosk\nCHOCOLATE BAR 2.00\nTOTAL 2.00", today)
+        assertEquals(listOf(200L), r.items.map { it.priceCents })
+    }
+
+    @Test
+    fun `a tax rate in brackets isn't the tax amount`() {
+        val text = """
+            Corner Market
+            Soap 10.00
+            Sales Tax 0.83 (8.25%)
+            TOTAL 10.83
+        """.trimIndent()
+
+        val r = ReceiptParser.parseText(text, today)
+
+        assertEquals(83L, r.taxCents)
+        assertEquals(1083L, r.totalCents)
+    }
+
+    @Test
+    fun `a total with a space as the thousands separator keeps its thousands`() {
+        val r = ReceiptParser.parseText("Magasin\nTV 1 234,56\nTOTAL 1 234,56", today)
+        assertEquals(123456L, r.totalCents)
+    }
 }

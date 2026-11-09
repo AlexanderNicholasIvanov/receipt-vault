@@ -16,20 +16,36 @@ object Money {
     data class Found(val cents: Long, val start: Int, val end: Int)
 
     // Integer part (with optional thousands separators), a decimal separator and exactly two decimals.
-    // The lookahead stops dates like 11.06.26 from reading as 11.06.
+    // The lookahead stops dates like 11.06.26 from reading as 11.06, and tax rates like 8.25% from reading as money.
     private val AMOUNT = Regex(
-        """(?<![\d.,])(\(?)(-?)\s?[${'$'}€£¥]?\s?(\d{1,3}(?:[,.']\d{3})+|\d+)([.,])(\d{2})(?!\d|[.,]\d)(\)?)(-?)""",
+        """(?<![\d.,])(\(?)(-?)\s?[${'$'}€£¥]?\s?(\d{1,3}(?:[,.']\d{3})+|\d+)([.,])(\d{2})(?!\d|[.,]\d|\s?%)(\)?)(-?)""",
     )
 
-    /** Every amount on a line, left to right. */
-    fun findAll(line: String): List<Found> = AMOUNT.findAll(line).mapNotNull { m ->
+    // "1 234,56": spaces as thousands separators, which only comma-decimal countries use.
+    private val SPACED_AMOUNT = Regex(
+        """(?<![\d.,])(\(?)(-?)\s?[${'$'}€£¥]?\s?(\d{1,3}(?:[ \u00A0\u202F]\d{3})+)(,)(\d{2})(?!\d|[.,]\d|\s?%)(\)?)(-?)""",
+    )
+
+    /**
+     * Every amount on a line, left to right.
+     *
+     * @param spacedThousands read "1 234,56" as one amount. Only for rows that hold a single
+     *   labelled amount such as a total: on an item row "2 100,00" is two of something at 100.00.
+     */
+    fun findAll(line: String, spacedThousands: Boolean = false): List<Found> {
+        val spaced = if (spacedThousands) SPACED_AMOUNT.findAll(line).mapNotNull(::found).toList() else emptyList()
+        val plain = AMOUNT.findAll(line).mapNotNull(::found).filter { p -> spaced.none { p.start < it.end && it.start < p.end } }
+        return (spaced + plain).sortedBy { it.start }
+    }
+
+    private fun found(m: MatchResult): Found? {
         val (open, minus, intPart, _, decimals, close, trailingMinus) = m.destructured
-        val whole = intPart.filter { it.isDigit() }.toLongOrNull() ?: return@mapNotNull null
-        if (whole > 9_999_999) return@mapNotNull null
+        val whole = intPart.filter { it.isDigit() }.toLongOrNull() ?: return null
+        if (whole > 9_999_999) return null
         val cents = whole * 100 + decimals.toLong()
         val negative = minus.isNotEmpty() || trailingMinus.isNotEmpty() || (open.isNotEmpty() && close.isNotEmpty())
-        Found(if (negative) -cents else cents, m.range.first, m.range.last + 1)
-    }.toList()
+        return Found(if (negative) -cents else cents, m.range.first, m.range.last + 1)
+    }
 
     /** Parses what a user typed into a money field. Blank or junk -> null. */
     fun parseUserInput(text: String): Long? {
