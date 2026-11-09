@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -33,6 +34,7 @@ import java.time.ZoneId
 /** How the photo was obtained. */
 enum class CaptureSource { SCAN, CAMERA, GALLERY, SHARED, PDF, MANUAL }
 
+@Serializable
 data class ItemDraft(val key: Long, val name: String, val quantity: String, val price: String)
 
 data class ReceiptDraft(
@@ -90,7 +92,7 @@ sealed interface ReviewState {
 
 class ReviewViewModel(
     private val app: AppContainer,
-    handle: SavedStateHandle,
+    private val handle: SavedStateHandle,
 ) : ViewModel() {
 
     private val receiptId: Long = handle.get<String>("id")?.toLongOrNull() ?: 0L
@@ -112,15 +114,31 @@ class ReviewViewModel(
 
     init {
         viewModelScope.launch {
+            val resumed = handle.get<String>(KEY_DRAFT)?.let(SavedDraft::decode)
             when {
-                receiptId != 0L -> loadExisting()
+                receiptId != 0L -> loadExisting(resumed)
+                resumed != null -> resume(resumed)
                 imageUris.isNotEmpty() -> processPhoto(imageUris.map { it.toUri() })
                 else -> startManual()
             }
         }
+        // Kept in the saved state so that Android closing the app in the background loses nothing.
+        viewModelScope.launch {
+            _state.collect { s ->
+                if (s is ReviewState.Editing) handle[KEY_DRAFT] = SavedDraft.of(s.draft, s.imagePath, ocrText, s.notice).encode()
+            }
+        }
     }
 
-    private suspend fun loadExisting() {
+    /** A new receipt that was being filled in when Android closed the app. */
+    private fun resume(saved: SavedDraft) {
+        ocrText = saved.ocrText
+        imagePath = saved.imagePath?.takeIf { File(it).isFile }
+        nextKey = (saved.items.maxOfOrNull { it.key } ?: 0) + 1
+        _state.value = ReviewState.Editing(saved.draft, isNew = true, imagePath = imagePath, notice = saved.notice)
+    }
+
+    private suspend fun loadExisting(resumed: SavedDraft?) {
         val r = app.receipts.get(receiptId) ?: run {
             _state.value = ReviewState.Failed("That receipt no longer exists.")
             return
@@ -130,8 +148,9 @@ class ReviewViewModel(
         imagePath = r.imagePath
         val at = Instant.ofEpochMilli(r.purchasedAt).atZone(ZoneId.systemDefault())
         val items = app.receipts.getItems(r.id).map { ItemDraft(nextKey++, it.name, it.quantity.toString(), Money.toPlain(it.priceCents)) }
+        nextKey = maxOf(nextKey, (resumed?.items?.maxOfOrNull { it.key } ?: 0) + 1)
         _state.value = ReviewState.Editing(
-            draft = ReceiptDraft(
+            draft = resumed?.draft ?: ReceiptDraft(
                 merchant = r.merchant,
                 category = Category.fromName(r.category),
                 date = at.toLocalDate(),
@@ -331,6 +350,7 @@ class ReviewViewModel(
                 }
                 _state.update { if (it is ReviewState.Editing) it.copy(error = null, duplicateOf = null) else it }
                 _saved.value = app.receipts.save(receipt, items)
+                handle.remove<String>(KEY_DRAFT)
                 app.checkAlertsSoon()
             } finally {
                 saving = false
@@ -343,5 +363,9 @@ class ReviewViewModel(
     override fun onCleared() {
         // A new capture the user backed out of: do not leave an orphaned photo behind.
         if (existing == null && _saved.value == null) app.receipts.discardImage(imagePath)
+    }
+
+    companion object {
+        internal const val KEY_DRAFT = "review_draft"
     }
 }

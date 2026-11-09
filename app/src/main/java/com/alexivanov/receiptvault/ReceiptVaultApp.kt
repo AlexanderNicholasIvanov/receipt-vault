@@ -63,6 +63,7 @@ class AppContainer(val context: Context) {
     init {
         appScope.launch {
             runCatching { receipts.purgeExpiredTrash() }
+            runCatching { receipts.sweepOrphanImages() }
             runCatching { alerts.run() }
         }
         // Download rates when conversion is turned on or the default currency changes, and once a day.
