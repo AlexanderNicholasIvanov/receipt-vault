@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
+import androidx.annotation.VisibleForTesting
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -39,8 +40,10 @@ class MainActivity : ComponentActivity() {
     /** Receipts to open, from tapping a reminder notification. */
     private val openReceipts = Channel<Long>(Channel.CONFLATED)
 
-    private var lockEnabled = false
-    private var locked by mutableStateOf(false)
+    private var lockEnabled by mutableStateOf(false)
+
+    /** Every open copy of the app reads the same session, so they lock and unlock together. */
+    private val locked get() = lockEnabled && !AppLockSession.unlocked
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -50,14 +53,13 @@ class MainActivity : ComponentActivity() {
         lockEnabled = runBlocking(Dispatchers.IO) { app.settings.current().appLock }
         // Unlocking lasts for this process only: after Android kills the app in the background
         // and restores it, the lock comes back.
-        locked = lockEnabled && !AppLockSession.unlocked
         applyRecentsPrivacy()
         lifecycleScope.launch {
             app.settings.settings.collect { s ->
                 val wasEnabled = lockEnabled
                 lockEnabled = s.appLock
                 // Turned on just now from Settings, by the person already using the app: stay open.
-                if (!s.appLock) locked = false else if (!wasEnabled) AppLockSession.unlocked = true
+                if (s.appLock && !wasEnabled) AppLockSession.unlocked = true
                 applyRecentsPrivacy()
             }
         }
@@ -76,11 +78,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     if (locked) {
-                        LockScreen(onUnlocked = {
-                            locked = false
-                            AppLockSession.unlocked = true
-                            AppLockSession.backgroundedAt = null
-                        })
+                        LockScreen(onUnlocked = { AppLockSession.unlocked = true })
                     }
                 }
             }
@@ -89,16 +87,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (AppLockPolicy.shouldLockOnReturn(lockEnabled, AppLockSession.backgroundedAt, SystemClock.elapsedRealtime())) {
-            locked = true
-            AppLockSession.unlocked = false
-        }
-        AppLockSession.backgroundedAt = null
+        AppLockSession.activityStarted(lockEnabled, SystemClock.elapsedRealtime())
     }
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) AppLockSession.backgroundedAt = SystemClock.elapsedRealtime()
+        AppLockSession.activityStopped(isChangingConfigurations, SystemClock.elapsedRealtime())
     }
 
     /** With the lock on, the recent-apps screen shows a blank card instead of your receipts. */
@@ -138,8 +132,33 @@ class MainActivity : ComponentActivity() {
 /**
  * Lock state that must outlive the activity (rotation, recreation) but not the
  * process: after Android kills the app in the background, it starts locked.
+ *
+ * It is shared because the app can be open more than once: sharing a photo starts
+ * a second copy inside the sharing app's task. One copy noticing the time away must
+ * lock them all, and only leaving every copy counts as leaving the app.
  */
 internal object AppLockSession {
-    var unlocked = false
+    var unlocked by mutableStateOf(false)
     var backgroundedAt: Long? = null
+    private var visibleActivities = 0
+
+    fun activityStarted(enabled: Boolean, now: Long) {
+        visibleActivities++
+        if (visibleActivities > 1) return
+        if (AppLockPolicy.shouldLockOnReturn(enabled, backgroundedAt, now)) unlocked = false
+        backgroundedAt = null
+    }
+
+    fun activityStopped(changingConfigurations: Boolean, now: Long) {
+        visibleActivities = (visibleActivities - 1).coerceAtLeast(0)
+        if (visibleActivities == 0 && !changingConfigurations) backgroundedAt = now
+    }
+
+    /** Tests share this object across activities they may not have stopped. */
+    @VisibleForTesting
+    fun reset() {
+        unlocked = false
+        backgroundedAt = null
+        visibleActivities = 0
+    }
 }
