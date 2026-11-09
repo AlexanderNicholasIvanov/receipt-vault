@@ -21,10 +21,13 @@ import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.update.UpdateController
 import com.alexivanov.receiptvault.update.UpdateState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -50,11 +53,17 @@ data class HomeUi(
     val settings: AppSettings = AppSettings(),
 )
 
+@OptIn(FlowPreview::class)
 class HomeViewModel(private val app: AppContainer) : ViewModel() {
     private val period = MutableStateFlow(Period.THIS_MONTH)
-    private val query = MutableStateFlow("")
+    private val _query = MutableStateFlow("")
+
+    /** What's in the search box, separate from [ui]: a text field has to follow typing exactly. */
+    val query: StateFlow<String> = _query
     private val filter = MutableStateFlow(ReceiptFilter())
-    private val listOptions = combine(period, query, filter) { p, q, f -> Triple(p, q, f) }
+
+    // The list waits for a pause in typing, but appears at once on opening or clearing the search.
+    private val listOptions = combine(period, _query.debounce { if (it.isEmpty()) 0 else SEARCH_PAUSE_MS }, filter) { p, q, f -> Triple(p, q, f) }
 
     val updates: UpdateController = app.updates
 
@@ -104,7 +113,7 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
             update = update,
             settings = settings,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
     init {
         app.checkForUpdatesOnLaunch()
@@ -165,10 +174,14 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
     }
 
     fun setFilter(f: ReceiptFilter) { filter.value = f }
-    fun setQuery(q: String) { query.value = q }
+    fun setQuery(q: String) { _query.value = q }
 
     fun dismissUpdate(versionCode: Int) {
         viewModelScope.launch { app.settings.setDismissedUpdate(versionCode) }
+    }
+
+    private companion object {
+        const val SEARCH_PAUSE_MS = 200L
     }
 
     private fun matches(r: Receipt, needle: String): Boolean =

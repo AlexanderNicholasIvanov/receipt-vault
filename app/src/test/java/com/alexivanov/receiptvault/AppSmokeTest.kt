@@ -1,7 +1,9 @@
 package com.alexivanov.receiptvault
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -100,6 +102,22 @@ class AppSmokeTest {
         compose.onNodeWithText("30 days left", substring = true).assertExists()
         compose.onNodeWithText("Restore").performClick()
         compose.waitUntilAtLeastOneExists(hasText("The trash is empty."), 5_000)
+    }
+
+    @Test
+    fun `search keeps every typed letter and narrows the list after a pause`() {
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        addManualReceipt("Corner Cafe", "25.60")
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
+
+        val box = hasSetTextAction()
+        "zzz".forEach { compose.onNode(box).performTextInput(it.toString()) }
+        compose.waitUntilAtLeastOneExists(hasText("No receipts match", substring = true), 10_000)
+        compose.onNode(box).assert(hasText("zzz"))
+
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 5_000)
     }
 
     @Test
