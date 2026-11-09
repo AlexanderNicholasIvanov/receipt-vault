@@ -312,6 +312,7 @@ class ReviewViewModel(
             ocrText = ocrText,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
+            deletedAt = existing?.deletedAt,
         )
         val items = d.items.mapNotNull { item ->
             val price = Money.parseUserInput(item.price) ?: return@mapNotNull null
