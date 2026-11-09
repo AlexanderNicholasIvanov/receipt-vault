@@ -13,6 +13,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +21,7 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -115,6 +117,38 @@ class BackupManagerTest {
         newPhone.save(receipt("Corner Cafe", 1250), emptyList())
         assertEquals(RestoreResult(added = 1, skipped = 1), newBackup.restore(ByteArrayInputStream(zip)))
         assertEquals(2, newPhone.getAll().size)
+    }
+
+    @Test
+    fun `a receipt whose photo file is gone still backs up`() = runBlocking {
+        val (oldPhone, oldBackup) = freshPhone()
+        oldPhone.save(receipt("Corner Cafe", 1250, File(context.filesDir, "receipts/missing.jpg")), emptyList())
+        val zip = ByteArrayOutputStream().also { assertEquals(1, oldBackup.export(it)) }.toByteArray()
+
+        val (newPhone, newBackup) = freshPhone()
+        newBackup.restore(ByteArrayInputStream(zip))
+        assertNull(newPhone.getAll().single().imagePath)
+    }
+
+    @Test
+    fun `a restore that fails partway leaves no stray photos or scratch files`() = runBlocking {
+        val (oldPhone, oldBackup) = freshPhone()
+        val photo = File(context.filesDir, "receipts/original.jpg").apply { parentFile!!.mkdirs(); writeBytes(byteArrayOf(1, 2)) }
+        oldPhone.save(receipt("Corner Cafe", 1250, photo), emptyList())
+        val zip = ByteArrayOutputStream().also { oldBackup.export(it) }.toByteArray()
+        photo.delete()
+
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        databases += db
+        val failing = object : ReceiptDao by db.receiptDao() {
+            override suspend fun save(receipt: Receipt, items: List<LineItem>): Long = throw IOException("disk full")
+        }
+        val backup = BackupManager(ReceiptRepository(failing, images), images, context.cacheDir, "1.0.9", clock = { 1_000L })
+
+        assertThrows(IOException::class.java) { runBlocking { backup.restore(ByteArrayInputStream(zip)) } }
+
+        assertEquals(emptyList<String>(), File(context.filesDir, "receipts").list().orEmpty().toList())
+        assertEquals(emptyList<String>(), context.cacheDir.list().orEmpty().filter { it.startsWith("restore-") })
     }
 
     @Test

@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import com.alexivanov.receiptvault.ui.startOutside
 import com.alexivanov.receiptvault.update.UpdateController
 import com.alexivanov.receiptvault.update.UpdateInfo
 import com.alexivanov.receiptvault.update.UpdateInstaller
@@ -112,7 +113,7 @@ fun UpdateCard(
                     is UpdateState.ReadyToInstall -> Button(onClick = { install(state.apk) }) { Text("Install") }
                     is UpdateState.DownloadFailed -> {
                         TextButton(onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, info.releaseUrl.ifBlank { info.apkUrl }.toUri()))
+                            context.startOutside(Intent(Intent.ACTION_VIEW, info.releaseUrl.ifBlank { info.apkUrl }.toUri()))
                         }) { Text("Open in browser") }
                         Button(onClick = { hint = null; controller.download() }) { Text("Retry") }
                     }

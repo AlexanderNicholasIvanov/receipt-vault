@@ -146,6 +146,13 @@ class ImageStore(private val context: Context) {
         return out
     }
 
+    /** Like [adopt], but moves [source] when it can, so a restore doesn't hold every photo twice. */
+    fun moveIn(source: File): File {
+        val out = File(dir, "${UUID.randomUUID()}.jpg")
+        if (!source.renameTo(out)) source.copyTo(out)
+        return out
+    }
+
     fun delete(path: String?) {
         if (path.isNullOrBlank()) return
         val file = File(path)

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
+import com.alexivanov.receiptvault.ui.startOutside
 import java.time.LocalDate
 import com.alexivanov.receiptvault.domain.Reminders
 import com.alexivanov.receiptvault.domain.Tags
@@ -281,7 +282,7 @@ private fun openMap(context: android.content.Context, merchant: String, address:
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, "geo:0,0?q=$query".toUri()))
     } catch (_: ActivityNotFoundException) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, "https://maps.google.com/?q=$query".toUri()))
+        context.startOutside(Intent(Intent.ACTION_VIEW, "https://maps.google.com/?q=$query".toUri()))
     }
 }
 
@@ -308,6 +309,6 @@ private fun share(context: android.content.Context, r: Receipt, items: List<Line
     if (image != null) {
         shareFile(context, image, "image/jpeg", "Share receipt", text)
     } else {
-        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share receipt"))
+        context.startOutside(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share receipt"))
     }
 }

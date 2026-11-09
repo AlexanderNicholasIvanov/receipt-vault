@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import androidx.core.graphics.createBitmap
+import com.alexivanov.receiptvault.domain.PdfRaster
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -28,8 +29,8 @@ class PdfPages(private val context: Context) {
                 (0 until minOf(pdf.pageCount, maxPages)).map { index ->
                     pdf.openPage(index).use { page ->
                         // PDF sizes are in points (1/72 in); render at a width OCR reads well.
-                        val scale = (TARGET_WIDTH.toFloat() / page.width).coerceIn(1f, 4f)
-                        val bitmap = createBitmap((page.width * scale).toInt(), (page.height * scale).toInt())
+                        val scale = PdfRaster.scale(page.width, page.height, TARGET_WIDTH)
+                        val bitmap = createBitmap((page.width * scale).toInt().coerceAtLeast(1), (page.height * scale).toInt().coerceAtLeast(1))
                         try {
                             bitmap.eraseColor(Color.WHITE)
                             page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)

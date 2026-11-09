@@ -54,8 +54,10 @@ import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import com.alexivanov.receiptvault.ui.shareFile
+import com.alexivanov.receiptvault.ui.startOutside
 import com.alexivanov.receiptvault.ui.update.UpdateCard
 import com.alexivanov.receiptvault.update.UpdateState
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import com.alexivanov.receiptvault.data.RatesStatus
 import androidx.compose.material3.TextButton
@@ -251,13 +253,17 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
                 supportingContent = { Text("Every receipt with amounts, tips, tax, store address and items. Opens in Excel or Google Sheets.") },
                 modifier = Modifier.clickable {
                     scope.launch {
-                        val file = withContext(Dispatchers.IO) {
-                            val csv = CsvExport.build(app.receipts.getAll(), app.receipts.getAllItems())
-                            File(context.cacheDir, "exports").apply { mkdirs() }
-                                .resolve("receipts-${LocalDate.now()}.csv")
-                                .apply { writeText(csv) }
+                        try {
+                            val file = withContext(Dispatchers.IO) {
+                                val csv = CsvExport.build(app.receipts.getAll(), app.receipts.getAllItems())
+                                File(context.cacheDir, "exports").apply { mkdirs() }
+                                    .resolve("receipts-${LocalDate.now()}.csv")
+                                    .apply { writeText(csv) }
+                            }
+                            shareFile(context, file, "text/csv", "Export receipts")
+                        } catch (e: IOException) {
+                            snackbar.showSnackbar("Couldn't create the export. Check that the phone has free space.")
                         }
-                        shareFile(context, file, "text/csv", "Export receipts")
                     }
                 },
             )
@@ -322,7 +328,7 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
                 headlineContent = { Text("Releases page") },
                 supportingContent = { Text("github.com/${BuildConfig.UPDATE_REPO}/releases", style = MaterialTheme.typography.bodySmall) },
                 modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/${BuildConfig.UPDATE_REPO}/releases".toUri()))
+                    context.startOutside(Intent(Intent.ACTION_VIEW, "https://github.com/${BuildConfig.UPDATE_REPO}/releases".toUri()))
                 },
             )
         }

@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.shareFile
+import java.io.IOException
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import androidx.compose.foundation.layout.Arrangement
@@ -181,7 +182,13 @@ fun HomeScreen(
                                     leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
                                     onClick = {
                                         showMore = false
-                                        scope.launch { shareFile(context, vm.exportSelected(context.cacheDir), "text/csv", "Export receipts") }
+                                        scope.launch {
+                                            try {
+                                                shareFile(context, vm.exportSelected(context.cacheDir), "text/csv", "Export receipts")
+                                            } catch (e: IOException) {
+                                                snackbar.showSnackbar("Couldn't create the export. Check that the phone has free space.")
+                                            }
+                                        }
                                     },
                                 )
                                 DropdownMenuItem(

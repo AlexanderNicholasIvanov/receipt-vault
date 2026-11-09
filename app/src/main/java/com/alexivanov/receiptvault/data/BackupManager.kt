@@ -72,6 +72,7 @@ class BackupManager(
             var manifestText: String? = null
             val photos = mutableMapOf<String, File>()
             var entries = 0
+            var spooled = 0L
             ZipInputStream(input.buffered()).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
@@ -84,7 +85,9 @@ class BackupManager(
                         // crafted name can't write outside the spool folder.
                         BackupFormat.isPhotoEntry(entry.name) -> {
                             val target = File(spool, "${photos.size}.jpg")
-                            target.outputStream().use { zip.copyCapped(it, MAX_PHOTO_BYTES) }
+                            spooled += target.outputStream().use { zip.copyCapped(it, MAX_PHOTO_BYTES) }
+                            if (spooled > MAX_TOTAL_BYTES) throw BackupException("This backup is too large to restore.")
+                            if (scratchDir.usableSpace < MIN_FREE_BYTES) throw BackupException("There isn't enough free storage on this phone to restore this backup.")
                             photos[entry.name] = target
                         }
                     }
@@ -106,7 +109,7 @@ class BackupManager(
                     skipped++
                     continue
                 }
-                val imagePath = b.photo?.let(photos::get)?.let { images.adopt(it).absolutePath }
+                val imagePath = b.photo?.let(photos::remove)?.let { images.moveIn(it).absolutePath }
                 val now = clock()
                 val receipt = Receipt(
                     merchant = b.merchant, address = b.address, phone = b.phone, category = b.category,
@@ -117,10 +120,17 @@ class BackupManager(
                     createdAt = b.createdAt.takeIf { it > 0 } ?: now, updatedAt = b.updatedAt.takeIf { it > 0 } ?: now,
                 )
                 val items = b.items.map { LineItem(receiptId = 0, position = 0, name = it.name, quantity = it.quantity, priceCents = it.priceCents) }
-                receipts.save(receipt, items)
+                try {
+                    receipts.save(receipt, items)
+                } catch (e: Throwable) {
+                    images.delete(imagePath)
+                    throw e
+                }
                 added++
             }
             RestoreResult(added, skipped)
+        } catch (e: OutOfMemoryError) {
+            throw BackupException("This backup is too large for this phone's memory.")
         } finally {
             spool.deleteRecursively()
         }
@@ -129,7 +139,8 @@ class BackupManager(
     private fun InputStream.readCapped(max: Long): ByteArray =
         java.io.ByteArrayOutputStream().also { copyCapped(it, max) }.toByteArray()
 
-    private fun InputStream.copyCapped(out: OutputStream, max: Long) {
+    /** @return how many bytes were copied. */
+    private fun InputStream.copyCapped(out: OutputStream, max: Long): Long {
         val buffer = ByteArray(64 * 1024)
         var total = 0L
         while (true) {
@@ -139,11 +150,14 @@ class BackupManager(
             if (total > max) throw BackupException("A file in the backup is larger than expected. Is it damaged?")
             out.write(buffer, 0, n)
         }
+        return total
     }
 
     private companion object {
         const val MAX_ENTRIES = 200_000
-        const val MAX_MANIFEST_BYTES = 200L * 1024 * 1024
+        const val MAX_MANIFEST_BYTES = 64L * 1024 * 1024
         const val MAX_PHOTO_BYTES = 60L * 1024 * 1024
+        const val MAX_TOTAL_BYTES = 20L * 1024 * 1024 * 1024
+        const val MIN_FREE_BYTES = 100L * 1024 * 1024
     }
 }
