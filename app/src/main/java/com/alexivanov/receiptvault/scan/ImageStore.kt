@@ -29,6 +29,19 @@ class ImageStore(private val context: Context) {
 
     private val dir: File get() = File(context.filesDir, "receipts").apply { mkdirs() }
 
+    /**
+     * Deletes photos no receipt uses, once they are old enough that no draft can still be
+     * waiting for them: a form Android closed in the background comes back with its photo.
+     *
+     * @param inUse file names of every receipt's photo, the trash included.
+     */
+    suspend fun sweepOrphans(inUse: Set<String>, now: Long = System.currentTimeMillis()): Int = withContext(Dispatchers.IO) {
+        val cutoff = now - ORPHAN_AFTER_MS
+        dir.listFiles { f -> f.isFile && f.extension == "jpg" && f.name !in inUse && f.lastModified() < cutoff }
+            .orEmpty()
+            .count { it.delete() }
+    }
+
     suspend fun import(uri: Uri): File = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         var rotation = 0
@@ -141,6 +154,7 @@ class ImageStore(private val context: Context) {
     }
 
     companion object {
+        private val ORPHAN_AFTER_MS = java.util.concurrent.TimeUnit.DAYS.toMillis(7)
         /** Long edge of stored photos; plenty for OCR and zooming in on fine print. */
         private const val MAX_EDGE = 2400
 

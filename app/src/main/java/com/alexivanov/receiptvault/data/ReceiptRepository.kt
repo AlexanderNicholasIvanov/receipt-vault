@@ -2,6 +2,7 @@ package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.scan.ImageStore
 import com.alexivanov.receiptvault.domain.TrashPolicy
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,4 +71,8 @@ class ReceiptRepository(
 
     /** Drops a photo that was captured but never saved as a receipt. */
     fun discardImage(path: String?) = images.delete(path)
+
+    /** Removes photos left behind by drafts that were never saved. @return how many. */
+    suspend fun sweepOrphanImages(): Int =
+        images.sweepOrphans(dao.getEverything().mapNotNullTo(HashSet()) { r -> r.imagePath?.let { File(it).name } })
 }
