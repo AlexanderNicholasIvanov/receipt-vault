@@ -1,10 +1,13 @@
 package com.alexivanov.receiptvault.data
 
-import android.app.Application
 import android.content.Context
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.alexivanov.receiptvault.domain.ExchangeRates
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -15,19 +18,26 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.util.UUID
 
-// A plain Application: ReceiptVaultApp watches the same setting and would download real rates
-// into the shared settings file, racing the fake source below.
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [36], application = Application::class)
+@Config(sdk = [36])
 class ExchangeRateRepositoryTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val settings = SettingsRepository(context)
+
+    // Its own settings file: the app objects of earlier tests are still alive and watching the
+    // shared one, and would download real rates into it, racing the fake source below.
+    private val settings = SettingsRepository(
+        PreferenceDataStoreFactory.create(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)) {
+            File(context.cacheDir, "rates-test-${UUID.randomUUID()}.preferences_pb")
+        },
+    )
     private var now = 10_000_000L
     private val source = FakeSource()
     private val repo = ExchangeRateRepository(settings, source) { now }

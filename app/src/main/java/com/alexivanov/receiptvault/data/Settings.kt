@@ -1,6 +1,8 @@
 package com.alexivanov.receiptvault.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -42,7 +44,9 @@ data class AppSettings(
         get() = exchangeRates?.takeIf { convertCurrencies && it.base == defaultCurrency }
 }
 
-class SettingsRepository(private val context: Context) {
+class SettingsRepository(private val store: DataStore<Preferences>) {
+    constructor(context: Context) : this(context.dataStore)
+
     private val currency = stringPreferencesKey("default_currency")
     private val dayFirst = booleanPreferencesKey("day_first_dates")
     private val dismissedUpdate = intPreferencesKey("dismissed_update")
@@ -54,7 +58,7 @@ class SettingsRepository(private val context: Context) {
     private val convertKey = booleanPreferencesKey("convert_currencies")
     private val ratesKey = stringPreferencesKey("exchange_rates")
 
-    val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
+    val settings: Flow<AppSettings> = store.data.map { p ->
         val defaults = AppSettings()
         AppSettings(
             defaultCurrency = p[currency] ?: defaults.defaultCurrency,
@@ -71,20 +75,20 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun current(): AppSettings = settings.first()
 
-    suspend fun setDefaultCurrency(value: String) = context.dataStore.edit { it[currency] = value }
-    suspend fun setDayFirstDates(value: Boolean) = context.dataStore.edit { it[dayFirst] = value }
-    suspend fun setDismissedUpdate(value: Int) = context.dataStore.edit { it[dismissedUpdate] = value }
-    suspend fun setAutoCheckUpdates(value: Boolean) = context.dataStore.edit { it[autoCheck] = value }
-    suspend fun setAppLock(value: Boolean) = context.dataStore.edit { it[appLockKey] = value }
-    suspend fun setLastBackupAt(value: Long) = context.dataStore.edit { it[lastBackup] = value }
-    suspend fun setBudgets(value: Budgets) = context.dataStore.edit { it[budgetsKey] = value.encode() }
-    suspend fun setConvertCurrencies(value: Boolean) = context.dataStore.edit { it[convertKey] = value }
-    suspend fun setExchangeRates(value: ExchangeRates?) = context.dataStore.edit {
+    suspend fun setDefaultCurrency(value: String) = store.edit { it[currency] = value }
+    suspend fun setDayFirstDates(value: Boolean) = store.edit { it[dayFirst] = value }
+    suspend fun setDismissedUpdate(value: Int) = store.edit { it[dismissedUpdate] = value }
+    suspend fun setAutoCheckUpdates(value: Boolean) = store.edit { it[autoCheck] = value }
+    suspend fun setAppLock(value: Boolean) = store.edit { it[appLockKey] = value }
+    suspend fun setLastBackupAt(value: Long) = store.edit { it[lastBackup] = value }
+    suspend fun setBudgets(value: Budgets) = store.edit { it[budgetsKey] = value.encode() }
+    suspend fun setConvertCurrencies(value: Boolean) = store.edit { it[convertKey] = value }
+    suspend fun setExchangeRates(value: ExchangeRates?) = store.edit {
         if (value == null) it.remove(ratesKey) else it[ratesKey] = value.encode()
     }
 
     /** Keys of reminder and budget notifications already shown, so each one is sent once. */
-    suspend fun sentAlerts(): Set<String> = context.dataStore.data.first()[sentAlerts].orEmpty()
+    suspend fun sentAlerts(): Set<String> = store.data.first()[sentAlerts].orEmpty()
 
-    suspend fun setSentAlerts(keys: Set<String>) = context.dataStore.edit { it[sentAlerts] = keys }
+    suspend fun setSentAlerts(keys: Set<String>) = store.edit { it[sentAlerts] = keys }
 }
