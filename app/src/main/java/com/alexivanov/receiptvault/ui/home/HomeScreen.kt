@@ -108,6 +108,7 @@ fun HomeScreen(
 ) {
     val vm = appViewModel { app, _ -> HomeViewModel(app) }
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -279,12 +280,12 @@ fun HomeScreen(
             if (ui.hasAny) {
                 item {
                     OutlinedTextField(
-                        value = ui.query,
+                        value = query,
                         onValueChange = vm::setQuery,
                         placeholder = { Text("Search merchant, item, note, tag") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
-                            if (ui.query.isNotEmpty()) {
+                            if (query.isNotEmpty()) {
                                 IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") }
                             }
                         },

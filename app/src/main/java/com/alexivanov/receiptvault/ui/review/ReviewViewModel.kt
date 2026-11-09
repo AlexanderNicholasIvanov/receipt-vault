@@ -17,6 +17,7 @@ import com.alexivanov.receiptvault.domain.ParsedReceipt
 import com.alexivanov.receiptvault.domain.ReceiptParser
 import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.scan.PdfPages
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.time.Instant
@@ -197,7 +199,7 @@ class ReviewViewModel(
         try {
             for (uri in uris) {
                 if (pages.size >= PdfPages.MAX_PAGES) break
-                if (PdfPages.isPdf(app.context, uri)) {
+                if (withContext(Dispatchers.IO) { PdfPages.isPdf(app.context, uri) }) {
                     fromPdf = true
                     _state.value = ReviewState.Working("Opening PDF…")
                     val rendered = app.pdfPages.render(uri, PdfPages.MAX_PAGES - pages.size)
@@ -222,11 +224,12 @@ class ReviewViewModel(
         val parsed = try {
             val rows = pages.flatMapIndexed { i, page ->
                 _state.value = ReviewState.Working(if (pages.size == 1) "Reading receipt…" else "Reading page ${i + 1} of ${pages.size}…")
-                LineAssembler.assemble(app.textReader.read(page))
+                val lines = app.textReader.read(page)
+                withContext(Dispatchers.Default) { LineAssembler.assemble(lines) }
             }
             ocrText = rows.joinToString("\n") { it.text }
             if (rows.isEmpty()) notice = "No text found. Fill in the details by hand, or retake the photo in better light."
-            ReceiptParser.parse(rows, LocalDate.now(), settings.dayFirstDates)
+            withContext(Dispatchers.Default) { ReceiptParser.parse(rows, LocalDate.now(), settings.dayFirstDates) }
         } catch (e: Exception) {
             notice = "Text recognition failed (${e.message ?: "unknown error"}). Fill in the details by hand."
             ParsedReceipt()
