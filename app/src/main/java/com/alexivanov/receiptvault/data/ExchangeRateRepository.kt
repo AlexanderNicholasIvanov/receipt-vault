@@ -1,13 +1,13 @@
 package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.domain.ExchangeRates
+import com.alexivanov.receiptvault.domain.UserFacingException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.FileNotFoundException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -29,7 +29,7 @@ class FrankfurterRateSource(private val clock: () -> Long = System::currentTimeM
         try {
             when (conn.responseCode) {
                 in 200..299 -> ExchangeRates.parseFrankfurter(conn.inputStream.bufferedReader().use { it.readText() }, clock())
-                404, 422 -> throw FileNotFoundException("The European Central Bank doesn't publish rates for $base.")
+                404, 422 -> throw UserFacingException("The European Central Bank doesn't publish rates for $base.")
                 else -> error("The rate service answered ${conn.responseCode}.")
             }
         } finally {
@@ -76,7 +76,7 @@ class ExchangeRateRepository(
         } catch (e: Exception) {
             _status.value = RatesStatus.Failed(
                 when (e) {
-                    is FileNotFoundException -> e.message ?: "No rates for ${s.defaultCurrency}."
+                    is UserFacingException -> e.message ?: "No rates for ${s.defaultCurrency}."
                     is java.io.IOException -> "Couldn't reach the rate service. Check your connection."
                     else -> "Couldn't read the exchange rates."
                 },

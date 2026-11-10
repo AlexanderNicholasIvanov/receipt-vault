@@ -1,5 +1,7 @@
 package com.alexivanov.receiptvault.update
 
+import com.alexivanov.receiptvault.domain.Problems
+import com.alexivanov.receiptvault.domain.UserFacingException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -18,7 +20,7 @@ fun interface ApkDownloader {
     suspend fun download(info: UpdateInfo, onProgress: (Float) -> Unit): File
 }
 
-class UpdateException(message: String) : Exception(message)
+class UpdateException(message: String) : UserFacingException(message)
 
 /** Everything the update UI (home banner, Settings) needs to render. */
 sealed interface UpdateState {
@@ -99,7 +101,7 @@ class UpdateController(
             } catch (e: UpdateException) {
                 UpdateState.DownloadFailed(info, e.message ?: "Download failed.")
             } catch (e: Exception) {
-                UpdateState.DownloadFailed(info, "Download failed: ${e.message ?: e::class.java.simpleName}")
+                UpdateState.DownloadFailed(info, Problems.message("Download failed", e, online = true))
             }
         }
     }

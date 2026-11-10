@@ -6,6 +6,7 @@ import android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEA
 import android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import android.hardware.biometrics.BiometricPrompt
 import android.os.CancellationSignal
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
@@ -67,7 +68,8 @@ object Authenticator {
                     },
                 )
         } catch (e: RuntimeException) {
-            onResult(false, "Couldn't show the unlock prompt: ${e.message ?: e::class.java.simpleName}")
+            Log.w("AppLock", "BiometricPrompt failed", e)
+            onResult(false, "Couldn't show the unlock prompt. Please try again.")
         }
     }
 }

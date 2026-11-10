@@ -50,7 +50,7 @@ data class BackupReceipt(
 @Serializable
 data class BackupItem(val name: String, val quantity: Int = 1, val priceCents: Long)
 
-class BackupException(message: String) : Exception(message)
+class BackupException(message: String) : UserFacingException(message)
 
 object BackupFormat {
     const val APP_ID = "receipt-vault"

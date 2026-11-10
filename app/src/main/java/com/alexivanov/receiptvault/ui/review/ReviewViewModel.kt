@@ -1,6 +1,7 @@
 package com.alexivanov.receiptvault.ui.review
 
 import android.net.Uri
+import android.util.Log
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -14,8 +15,10 @@ import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.PageUris
 import com.alexivanov.receiptvault.domain.ParsedReceipt
+import com.alexivanov.receiptvault.domain.Problems
 import com.alexivanov.receiptvault.domain.ReceiptParser
 import com.alexivanov.receiptvault.domain.Tags
+import com.alexivanov.receiptvault.domain.UserFacingException
 import com.alexivanov.receiptvault.scan.PdfPages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -213,11 +216,12 @@ class ReviewViewModel(
                     pages += app.images.import(uri)
                 }
             }
-            require(pages.isNotEmpty()) { "Nothing to import." }
+            if (pages.isEmpty()) throw UserFacingException("There was nothing to import.")
         } catch (e: Exception) {
             pages.forEach { app.images.delete(it.absolutePath) }
             val what = if (fromPdf) "PDF" else "photo"
-            _state.value = ReviewState.Failed("Could not open that $what: ${e.message ?: "unknown error"}")
+            Log.w(TAG, "Import failed", e)
+            _state.value = ReviewState.Failed(Problems.message("Couldn't open that $what", e))
             return
         } catch (e: OutOfMemoryError) {
             pages.forEach { app.images.delete(it.absolutePath) }
@@ -236,7 +240,8 @@ class ReviewViewModel(
             if (rows.isEmpty()) notice = "No text found. Fill in the details by hand, or retake the photo in better light."
             withContext(Dispatchers.Default) { ReceiptParser.parse(rows, LocalDate.now(), settings.dayFirstDates) }
         } catch (e: Exception) {
-            notice = "Text recognition failed (${e.message ?: "unknown error"}). Fill in the details by hand."
+            Log.w(TAG, "Text recognition failed", e)
+            notice = "Couldn't read the text on this receipt. Fill in the details by hand."
             ParsedReceipt()
         }
 
@@ -390,6 +395,7 @@ class ReviewViewModel(
     }
 
     companion object {
+        private const val TAG = "ReviewViewModel"
         internal const val KEY_DRAFT = "review_draft"
     }
 }

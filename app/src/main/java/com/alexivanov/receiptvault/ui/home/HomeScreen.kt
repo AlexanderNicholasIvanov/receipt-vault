@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import com.alexivanov.receiptvault.domain.Problems
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.shareFile
 import java.io.IOException
@@ -124,7 +125,7 @@ fun HomeScreen(
             try {
                 shareFile(context, vm.expenseReport(context.cacheDir), "application/pdf", "Share expense report")
             } catch (e: Exception) {
-                snackbar.showSnackbar("Couldn't make the report: ${e.message ?: e::class.java.simpleName}")
+                snackbar.showSnackbar(Problems.message("Couldn't make the report", e))
             } finally {
                 working = false
             }

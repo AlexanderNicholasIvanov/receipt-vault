@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.alexivanov.receiptvault.domain.ExchangeRates
+import com.alexivanov.receiptvault.domain.UserFacingException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,7 +20,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -91,7 +91,7 @@ class ExchangeRateRepositoryTest {
         assertEquals(saved, settings.current().exchangeRates)
         assertEquals(RatesStatus.Failed("Couldn't reach the rate service. Check your connection."), repo.status.value)
 
-        source.failWith = FileNotFoundException("The European Central Bank doesn't publish rates for XYZ.")
+        source.failWith = UserFacingException("The European Central Bank doesn't publish rates for XYZ.")
         repo.refreshIfNeeded(force = true)
         assertEquals(RatesStatus.Failed("The European Central Bank doesn't publish rates for XYZ."), repo.status.value)
 
