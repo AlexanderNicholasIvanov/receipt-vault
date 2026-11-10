@@ -17,6 +17,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.alexivanov.receiptvault.domain.Problems
@@ -115,7 +116,7 @@ fun HomeScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showSheet by remember { mutableStateOf(false) }
-    var showFilters by remember { mutableStateOf(false) }
+    var showFilters by rememberSaveable { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     fun makeReport() {
@@ -198,14 +199,7 @@ fun HomeScreen(
                                     onClick = {
                                         showMore = false
                                         scope.launch {
-                                            val n = vm.downloadSelectedPhotos()
-                                            snackbar.showSnackbar(
-                                                when (n) {
-                                                    0 -> "None of these receipts have a photo."
-                                                    1 -> "Saved 1 photo to Pictures/Receipt Vault"
-                                                    else -> "Saved $n photos to Pictures/Receipt Vault"
-                                                },
-                                            )
+                                            snackbar.showSnackbar(vm.downloadSelectedPhotos().message)
                                         }
                                     },
                                 )

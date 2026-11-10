@@ -10,6 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -90,13 +92,14 @@ fun AppNav(
     }
 
     NavHost(navController = nav, startDestination = Routes.HOME) {
-        composable(Routes.HOME) {
+        composable(Routes.HOME) { entry ->
             HomeScreen(
-                onOpen = { nav.navigate(Routes.detail(it)) },
+                onOpen = { entry.ifResumed { nav.navigate(Routes.detail(it)) } },
+                // Not guarded: scanner and picker results can arrive before the screen is resumed.
                 onCaptured = { uris, source -> nav.navigate(Routes.review(uris, source)) },
-                onManual = { nav.navigate(Routes.review()) },
-                onInsights = { nav.navigate(Routes.INSIGHTS) },
-                onSettings = { nav.navigate(Routes.SETTINGS) },
+                onManual = { entry.ifResumed { nav.navigate(Routes.review()) } },
+                onInsights = { entry.ifResumed { nav.navigate(Routes.INSIGHTS) } },
+                onSettings = { entry.ifResumed { nav.navigate(Routes.SETTINGS) } },
                 scanRequests = scanRequestFlow,
             )
         }
@@ -107,9 +110,9 @@ fun AppNav(
                 navArgument("source") { type = NavType.StringType; defaultValue = CaptureSource.MANUAL.name },
                 navArgument("id") { type = NavType.StringType; defaultValue = "" },
             ),
-        ) {
+        ) { entry ->
             ReviewScreen(
-                onBack = { nav.popBackStack() },
+                onBack = { entry.ifResumed { nav.popBackStack() } },
                 onUnsavedWork = { reviewHasUnsavedWork = it },
                 onSaved = { id ->
                     // Replace the editor with the saved receipt; editing an existing one just returns to it.
@@ -120,13 +123,21 @@ fun AppNav(
         }
         composable(Routes.DETAIL, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
             val id = entry.arguments?.getLong("id") ?: return@composable
-            DetailScreen(id = id, onBack = { nav.popBackStack() }, onEdit = { nav.navigate(Routes.review(id = it)) })
+            DetailScreen(id = id, onBack = { entry.ifResumed { nav.popBackStack() } }, onEdit = { entry.ifResumed { nav.navigate(Routes.review(id = it)) } })
         }
-        composable(Routes.INSIGHTS) { InsightsScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { nav.popBackStack() }, onTrash = { nav.navigate(Routes.TRASH) }, onBudgets = { nav.navigate(Routes.BUDGETS) })
+        composable(Routes.INSIGHTS) { entry -> InsightsScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }
+        composable(Routes.SETTINGS) { entry ->
+            SettingsScreen(onBack = { entry.ifResumed { nav.popBackStack() } }, onTrash = { entry.ifResumed { nav.navigate(Routes.TRASH) } }, onBudgets = { entry.ifResumed { nav.navigate(Routes.BUDGETS) } })
         }
-        composable(Routes.BUDGETS) { BudgetScreen(onBack = { nav.popBackStack() }) }
-        composable(Routes.TRASH) { TrashScreen(onBack = { nav.popBackStack() }) }
+        composable(Routes.BUDGETS) { entry -> BudgetScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }
+        composable(Routes.TRASH) { entry -> TrashScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }
     }
+}
+
+/**
+ * Runs [action] only while this screen is the one showing. A second tap on Back while the
+ * screen is already leaving would otherwise pop the screen beneath it too, down to a blank one.
+ */
+private fun NavBackStackEntry.ifResumed(action: () -> Unit) {
+    if (lifecycle.currentState == Lifecycle.State.RESUMED) action()
 }

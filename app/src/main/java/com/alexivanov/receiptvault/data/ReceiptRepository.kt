@@ -1,17 +1,22 @@
 package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.scan.ImageStore
+import com.alexivanov.receiptvault.domain.ReceiptSearch
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 
 class ReceiptRepository(
     private val dao: ReceiptDao,
     private val images: ImageStore,
 ) {
     val receipts: Flow<List<Receipt>> = dao.observeAll()
+
+    /** Line item names per receipt, for the search box. */
+    val itemText: Flow<Map<Long, String>> = dao.observeItemNames().map { names -> ReceiptSearch.itemText(names.map { it.receiptId to it.name }) }
 
     fun receipt(id: Long): Flow<Receipt?> = dao.observe(id)
     fun items(id: Long): Flow<List<LineItem>> = dao.observeItems(id)

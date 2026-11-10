@@ -28,10 +28,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -64,20 +64,24 @@ fun BudgetScreen(onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     val askNotifications = rememberNotificationPermissionRequest()
 
-    var monthly by remember { mutableStateOf("") }
-    val perCategory = remember { mutableStateMapOf<Category, String>() }
-    var loaded by remember { mutableStateOf(false) }
+    // Saveable, so turning the phone keeps amounts typed but not yet saved.
+    var monthly by rememberSaveable { mutableStateOf("") }
+    var perCategory by rememberSaveable { mutableStateOf(mapOf<Category, String>()) }
+    var loaded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(settings) {
         val s = settings ?: return@LaunchedEffect
         if (loaded) return@LaunchedEffect
         monthly = s.budgets.monthlyCents?.let(Money::toPlain).orEmpty()
-        s.budgets.byCategory.forEach { (c, cents) -> perCategory[c] = Money.toPlain(cents) }
+        perCategory = s.budgets.byCategory.mapValues { (_, cents) -> Money.toPlain(cents) }
         loaded = true
     }
 
     val s = settings
     val currency = s?.defaultCurrency ?: "USD"
-    val uses = if (s == null) emptyList() else BudgetMath.usage(s.budgets, Conversion.toBase(receipts, s.activeRates), currency, YearMonth.now())
+    // Not on every keystroke in the amount fields: only when the receipts or saved budgets change.
+    val uses = remember(s, receipts) {
+        if (s == null) emptyList() else BudgetMath.usage(s.budgets, Conversion.toBase(receipts, s.activeRates), currency, YearMonth.now())
+    }
 
     Scaffold(
         topBar = {
@@ -113,7 +117,7 @@ fun BudgetScreen(onBack: () -> Unit) {
             }
             item { AmountField("Everything", monthly) { monthly = it } }
             items(Category.entries, key = { it.name }) { c ->
-                AmountField("${c.emoji} ${c.label}", perCategory[c].orEmpty()) { perCategory[c] = it }
+                AmountField("${c.emoji} ${c.label}", perCategory[c].orEmpty()) { perCategory = perCategory + (c to it) }
             }
             item {
                 Button(
@@ -149,12 +153,18 @@ private fun UsageRow(use: BudgetUse, currency: String) {
             Text("${money(use.spentCents, currency)} of ${money(use.budgetCents, currency)}")
         }
         LinearProgressIndicator(progress = { use.fraction }, color = color, modifier = Modifier.fillMaxWidth())
-        if (use.level == BudgetLevel.OVER) {
-            Text(
+        // Said in words too, not by colour alone.
+        when (use.level) {
+            BudgetLevel.OVER -> Text(
                 "Over by ${money(use.spentCents - use.budgetCents, currency)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
+            BudgetLevel.NEAR -> Text(
+                "Almost used: ${money(use.budgetCents - use.spentCents, currency)} left",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            BudgetLevel.OK -> Unit
         }
     }
 }
