@@ -2,7 +2,6 @@ package com.alexivanov.receiptvault.ui.detail
 
 import androidx.compose.foundation.layout.Box
 import com.alexivanov.receiptvault.domain.Problems
-import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.startOutside
@@ -109,7 +108,7 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                         if (r.deletedAt == null) {
                             IconButton(onClick = { onEdit(r.id) }) { Icon(Icons.Default.Edit, contentDescription = "Edit") }
                             IconButton(onClick = {
-                                // Undo is offered on the home screen; the trash keeps it for 30 days.
+                                // Undo is offered on the home screen; the trash keeps it until the user deletes it for good.
                                 // App scope, so leaving this screen can't cancel the write.
                                 app.appScope.launch { app.receipts.moveToTrash(listOf(r.id)) }
                                 onBack()
@@ -122,7 +121,7 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (loaded != null && receipt == null) {
-            // A reminder can outlive its receipt: emptied from the trash, or removed after 30 days.
+            // A reminder can outlive its receipt once it is deleted for good from the trash.
             Box(Modifier.padding(padding).fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text("This receipt no longer exists.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -133,11 +132,10 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             r.deletedAt?.let { deletedAt ->
-                val days = TrashPolicy.daysLeft(deletedAt, System.currentTimeMillis())
                 Card(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            if (days <= 1) "In the trash · deleted tomorrow" else "In the trash · $days days left",
+                            "In the trash since ${formatDate(deletedAt)}",
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = { app.appScope.launch { app.receipts.restoreFromTrash(listOf(r.id)) } }) { Text("Restore") }

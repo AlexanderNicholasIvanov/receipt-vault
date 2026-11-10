@@ -49,7 +49,6 @@ import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.BackupFormat
 import com.alexivanov.receiptvault.domain.CsvExport
 import com.alexivanov.receiptvault.domain.UserFacingException
-import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.money
@@ -274,9 +273,9 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
                 supportingContent = {
                     Text(
                         when (trash.size) {
-                            0 -> "Empty. Deleted receipts wait here for ${TrashPolicy.RETENTION_DAYS} days."
-                            1 -> "1 deleted receipt, kept for ${TrashPolicy.RETENTION_DAYS} days."
-                            else -> "${trash.size} deleted receipts, kept for ${TrashPolicy.RETENTION_DAYS} days."
+                            0 -> "Empty. Deleted receipts stay here until you delete them for good."
+                            1 -> "1 deleted receipt."
+                            else -> "${trash.size} deleted receipts."
                         },
                     )
                 },

@@ -2,7 +2,6 @@ package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.scan.ImageStore
 import com.alexivanov.receiptvault.domain.ReceiptSearch
-import com.alexivanov.receiptvault.domain.TrashPolicy
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,13 +65,6 @@ class ReceiptRepository(
     }
 
     suspend fun emptyTrash() = deleteForever(dao.getTrash())
-
-    /** Run at startup: the trash keeps receipts for [TrashPolicy.RETENTION_DAYS] days. */
-    suspend fun purgeExpiredTrash(now: Long = System.currentTimeMillis()): Int {
-        val expired = dao.getTrashedBefore(TrashPolicy.cutoff(now))
-        deleteForever(expired)
-        return expired.size
-    }
 
     /** Drops a photo that was captured but never saved as a receipt. */
     fun discardImage(path: String?) = images.delete(path)
