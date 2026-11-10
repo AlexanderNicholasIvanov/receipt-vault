@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.core.net.toUri
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +48,7 @@ import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.BackupFormat
 import com.alexivanov.receiptvault.domain.CsvExport
-import com.alexivanov.receiptvault.domain.Problems
+import com.alexivanov.receiptvault.domain.UserFacingException
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
@@ -61,6 +62,7 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import com.alexivanov.receiptvault.data.RatesStatus
 import androidx.compose.material3.TextButton
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -81,25 +83,26 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
 
     LaunchedEffect(settings.defaultCurrency) { currency = settings.defaultCurrency }
 
-    var backupBusy by remember { mutableStateOf(false) }
-    fun runBackupTask(task: suspend () -> String) {
-        backupBusy = true
-        scope.launch {
-            val message = try {
-                task()
-            } catch (e: Exception) {
-                // Backup problems explain themselves; anything else gets plain words.
-                Problems.message("Something went wrong", e)
-            }
-            backupBusy = false
+    // Backups run in the app's scope: leaving this screen doesn't stop one halfway.
+    val backupBusy by app.backupTasks.busy.collectAsStateWithLifecycle()
+    DisposableEffect(app) {
+        val stopWatching = app.backupTasks.watch()
+        onDispose { stopWatching() }
+    }
+    // One long-lived collector: keying an effect on the result would cancel the snackbar it shows.
+    LaunchedEffect(app) {
+        app.backupTasks.result.filterNotNull().collect { message ->
+            app.backupTasks.resultShown()
             snackbar.showSnackbar(message)
         }
     }
+    // The application's resolver: a task may finish after this screen and its activity are gone.
+    val resolver = app.context.contentResolver
     val createBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) {
-            runBackupTask {
-                val count = context.contentResolver.openOutputStream(uri, "wt")?.use { app.backup.export(it) }
-                    ?: error("Couldn't write to that location.")
+            app.backupTasks.run {
+                val count = resolver.openOutputStream(uri, "wt")?.use { app.backup.export(it) }
+                    ?: throw UserFacingException("Couldn't write to that location.")
                 app.settings.setLastBackupAt(System.currentTimeMillis())
                 "Backed up $count receipt${if (count == 1) "" else "s"}."
             }
@@ -107,9 +110,9 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
     }
     val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            runBackupTask {
-                val result = context.contentResolver.openInputStream(uri)?.use { app.backup.restore(it) }
-                    ?: error("Couldn't open that file.")
+            app.backupTasks.run {
+                val result = resolver.openInputStream(uri)?.use { app.backup.restore(it) }
+                    ?: throw UserFacingException("Couldn't open that file.")
                 buildString {
                     append("Restored ${result.added} receipt${if (result.added == 1) "" else "s"}")
                     if (result.skipped > 0) append(" (${result.skipped} already on this phone)")
