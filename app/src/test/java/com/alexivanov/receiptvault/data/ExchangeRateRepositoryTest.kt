@@ -9,6 +9,10 @@ import com.alexivanov.receiptvault.domain.UserFacingException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -100,11 +104,25 @@ class ExchangeRateRepositoryTest {
         assertEquals(RatesStatus.Idle, repo.status.value)
     }
 
+    @Test
+    fun `a cancelled refresh is cancelled, not reported as a failed download`() = runBlocking {
+        settings.setConvertCurrencies(true)
+        source.hang = true
+        val job = launch(Dispatchers.Default) { repo.refreshIfNeeded() }
+        while (repo.status.value != RatesStatus.Loading) yield()
+        job.cancelAndJoin()
+
+        assertTrue(job.isCancelled)
+        assertEquals(RatesStatus.Idle, repo.status.value)
+    }
+
     private inner class FakeSource : RateSource {
         val asked = mutableListOf<String>()
         var failWith: Exception? = null
+        var hang = false
         override suspend fun latest(base: String): ExchangeRates {
             failWith?.let { throw it }
+            if (hang) awaitCancellation()
             asked += base
             return ExchangeRates(base, LocalDate.parse("2026-11-05"), mapOf("GBP" to BigDecimal("0.8")), now)
         }

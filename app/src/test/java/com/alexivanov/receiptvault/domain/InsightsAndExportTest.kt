@@ -90,4 +90,11 @@ class InsightsAndExportTest {
         assertEquals(UpdateChecker.Outcome.UpToDate, UpdateChecker.parse("""{"tag_name":"v1.0.20","assets":[]}""", 5))
         assertEquals(UpdateChecker.Outcome.Failed, UpdateChecker.parse("not json", 5))
     }
+
+    @Test
+    fun `cells starting with tab or carriage return can't become formulas`() {
+        assertEquals("'\t=1+2", CsvExport.escape("\t=1+2"))
+        assertEquals("\"'\r=1+2\"", CsvExport.escape("\r=1+2"))
+        assertEquals("-12.50", CsvExport.escape("-12.50"))
+    }
 }

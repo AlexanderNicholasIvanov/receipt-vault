@@ -51,7 +51,8 @@ object CsvExport {
 
     /** RFC 4180 quoting, plus a guard against spreadsheet formula injection. */
     internal fun escape(value: String): String {
-        val safe = if (value.isNotEmpty() && value[0] in "=+-@" && value.toDoubleOrNull() == null) "'$value" else value
+        // OWASP's list: = + - @, and tab and carriage return, which some spreadsheets skip before a formula.
+        val safe = if (value.isNotEmpty() && value[0] in "=+-@\t\r" && value.toDoubleOrNull() == null) "'$value" else value
         return if (safe.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
             "\"" + safe.replace("\"", "\"\"") + "\""
         } else {
