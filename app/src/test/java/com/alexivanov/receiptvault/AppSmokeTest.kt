@@ -42,7 +42,7 @@ class AppSmokeTest {
 
     @Test
     fun `manual receipt is saved, shown and totalled`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
 
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
@@ -72,7 +72,7 @@ class AppSmokeTest {
 
     @Test
     fun `deleting goes to the trash with undo, and the trash can restore`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         addManualReceipt("Corner Cafe", "25.60")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
@@ -106,7 +106,7 @@ class AppSmokeTest {
 
     @Test
     fun `search keeps every typed letter and narrows the list after a pause`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         addManualReceipt("Corner Cafe", "25.60")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
@@ -122,7 +122,7 @@ class AppSmokeTest {
 
     @Test
     fun `filters narrow and sort the list`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         addManualReceipt("Corner Cafe", "25.60")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
@@ -148,7 +148,7 @@ class AppSmokeTest {
 
     @Test
     fun `tagged receipts can be filtered by tag and reported`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         addManualReceipt("Corner Cafe", "25.60", tags = "work, #Berlin trip")
         compose.onNodeWithText("#work   #Berlin trip").performScrollTo().assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
@@ -170,7 +170,7 @@ class AppSmokeTest {
 
     @Test
     fun `reminders and budgets`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Monthly budgets"), 5_000)
         compose.onNodeWithText("Monthly budgets").performClick()
@@ -202,7 +202,7 @@ class AppSmokeTest {
 
     @Test
     fun `saving the same receipt twice asks first`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         addManualReceipt("Corner Cafe", "25.60")
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
@@ -231,7 +231,7 @@ class AppSmokeTest {
     @Test
     fun `other currencies count once conversion is on`() {
         val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
         try {
             runBlocking {
                 app.settings.setDefaultCurrency("USD")
@@ -278,7 +278,7 @@ class AppSmokeTest {
 
     @Test
     fun `insights and settings screens open`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitForEmptyHome()
 
         compose.onNodeWithContentDescription("Insights").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Monthly spending"), 5_000)
