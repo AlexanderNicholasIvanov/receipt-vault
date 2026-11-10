@@ -2,6 +2,7 @@ package com.alexivanov.receiptvault.data
 
 import com.alexivanov.receiptvault.domain.ExchangeRates
 import com.alexivanov.receiptvault.domain.UserFacingException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +74,9 @@ class ExchangeRateRepository(
             settings.setExchangeRates(fresh)
             _status.value = RatesStatus.Idle
             true
+        } catch (e: CancellationException) {
+            _status.value = RatesStatus.Idle
+            throw e
         } catch (e: Exception) {
             _status.value = RatesStatus.Failed(
                 when (e) {

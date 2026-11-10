@@ -2,9 +2,11 @@ package com.alexivanov.receiptvault.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -13,12 +15,18 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.alexivanov.receiptvault.domain.Budgets
 import com.alexivanov.receiptvault.domain.ExchangeRates
 import com.alexivanov.receiptvault.domain.Money
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 
-private val Context.dataStore by preferencesDataStore("settings")
+// A damaged settings file is replaced with defaults instead of failing every read.
+private val Context.dataStore by preferencesDataStore(
+    "settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 data class AppSettings(
     /** Currency used when a receipt does not show one. */
@@ -58,7 +66,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     private val convertKey = booleanPreferencesKey("convert_currencies")
     private val ratesKey = stringPreferencesKey("exchange_rates")
 
-    val settings: Flow<AppSettings> = store.data.map { p ->
+    // A read error (rare: storage trouble) shows defaults rather than crashing the screen.
+    val settings: Flow<AppSettings> = store.data.catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }.map { p ->
         val defaults = AppSettings()
         AppSettings(
             defaultCurrency = p[currency] ?: defaults.defaultCurrency,
@@ -74,6 +83,15 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     }
 
     suspend fun current(): AppSettings = settings.first()
+
+    /**
+     * Saves the phone's currency as the default the first time the app runs. Until saved it would
+     * follow the phone's region, and budgets, which are in the default currency, would quietly
+     * change currency after travelling or changing the region.
+     */
+    suspend fun pinDefaultCurrency() {
+        store.edit { if (it[currency] == null) it[currency] = Money.defaultCurrency() }
+    }
 
     suspend fun setDefaultCurrency(value: String) = store.edit { it[currency] = value }
     suspend fun setDayFirstDates(value: Boolean) = store.edit { it[dayFirst] = value }

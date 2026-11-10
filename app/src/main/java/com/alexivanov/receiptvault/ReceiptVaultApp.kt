@@ -70,6 +70,7 @@ class AppContainer(val context: Context) {
 
     init {
         appScope.launch {
+            runCatching { settings.pinDefaultCurrency() }
             runCatching { receipts.purgeExpiredTrash() }
             runCatching { receipts.sweepOrphanImages() }
             runCatching { alerts.run() }
