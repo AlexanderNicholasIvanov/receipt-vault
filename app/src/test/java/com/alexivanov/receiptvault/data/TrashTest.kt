@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.data
 
+import android.app.Application
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -77,7 +78,9 @@ class TrashTest {
         assertNull(repo.pendingUndo.value)
     }
 
+    // A plain Application: the real app sweeps at startup on another thread, against its own empty database.
     @Test
+    @Config(application = Application::class)
     fun `trashed receipts and their photos are kept however long ago they were deleted`() = runBlocking {
         // Old enough that the photo sweep would take it if no receipt claimed it.
         val oldPhoto = photo("old").apply { setLastModified(System.currentTimeMillis() - 365 * day) }
