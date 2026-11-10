@@ -15,6 +15,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
 import com.alexivanov.receiptvault.domain.PageLayout
+import com.alexivanov.receiptvault.domain.UserFacingException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -53,13 +54,13 @@ class ImageStore(private val context: Context) {
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "That file is not a readable image." }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw UserFacingException("That file isn't a picture this phone can read.")
 
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_EDGE) sample *= 2
         val decoded = resolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: error("Could not decode the image.")
+        } ?: throw UserFacingException("That picture couldn't be read.")
 
         val upright = if (rotation != 0) {
             val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
@@ -82,7 +83,7 @@ class ImageStore(private val context: Context) {
      */
     suspend fun saveToPictures(path: String, displayName: String): Uri = withContext(Dispatchers.IO) {
         val source = File(path)
-        require(source.isFile) { "The photo for this receipt is missing." }
+        if (!source.isFile) throw UserFacingException("The photo for this receipt is missing.")
         val resolver = context.contentResolver
         val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val values = ContentValues().apply {
@@ -92,10 +93,10 @@ class ImageStore(private val context: Context) {
             // Hidden from other apps until the bytes are fully written.
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
-        val uri = resolver.insert(collection, values) ?: error("The phone's storage refused the file.")
+        val uri = resolver.insert(collection, values) ?: throw UserFacingException("The phone's storage refused the file.")
         try {
             resolver.openOutputStream(uri)?.use { out -> source.inputStream().use { it.copyTo(out) } }
-                ?: error("Couldn't write to the phone's storage.")
+                ?: throw UserFacingException("Couldn't write to the phone's storage.")
             resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
         } catch (e: Exception) {
             resolver.delete(uri, null, null)

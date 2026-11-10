@@ -1,6 +1,7 @@
 package com.alexivanov.receiptvault.ui.detail
 
 import androidx.compose.foundation.layout.Box
+import com.alexivanov.receiptvault.domain.Problems
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
@@ -167,7 +168,7 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
                                 )
                                 if (result == SnackbarResult.ActionPerformed) viewImage(context, uri)
                             }.onFailure { e ->
-                                snackbar.showSnackbar("Couldn't save the image: ${e.message ?: "unknown error"}")
+                                snackbar.showSnackbar(Problems.message("Couldn't save the image", e))
                             }
                         }
                     },

@@ -4,9 +4,9 @@ import android.content.Context
 import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.alexivanov.receiptvault.domain.Problems
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
@@ -50,7 +50,6 @@ class ImageStoreTest {
     @Test
     fun `a missing photo fails with a readable message`() {
         val e = runCatching { runBlocking { ImageStore(context).saveToPictures("/nope/missing.jpg", "x.jpg") } }.exceptionOrNull()
-        assertTrue(e is IllegalArgumentException)
-        assertEquals("The photo for this receipt is missing.", e!!.message)
+        assertEquals("The photo for this receipt is missing.", Problems.message("Couldn't save the image", e!!))
     }
 }

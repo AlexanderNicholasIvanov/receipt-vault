@@ -45,9 +45,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.BuildConfig
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
-import com.alexivanov.receiptvault.domain.BackupException
 import com.alexivanov.receiptvault.domain.BackupFormat
 import com.alexivanov.receiptvault.domain.CsvExport
+import com.alexivanov.receiptvault.domain.Problems
 import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
@@ -87,10 +87,9 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
         scope.launch {
             val message = try {
                 task()
-            } catch (e: BackupException) {
-                e.message ?: "That backup couldn't be read."
             } catch (e: Exception) {
-                "Something went wrong: ${e.message ?: e::class.java.simpleName}"
+                // Backup problems explain themselves; anything else gets plain words.
+                Problems.message("Something went wrong", e)
             }
             backupBusy = false
             snackbar.showSnackbar(message)

@@ -7,6 +7,7 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import androidx.core.graphics.createBitmap
 import com.alexivanov.receiptvault.domain.PdfRaster
+import com.alexivanov.receiptvault.domain.UserFacingException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -17,15 +18,15 @@ class PdfPages(private val context: Context) {
     /** Renders up to [maxPages] pages as JPEGs in the cache; the caller deletes them. */
     suspend fun render(uri: Uri, maxPages: Int = MAX_PAGES): List<File> = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "pdf-pages").apply { mkdirs() }
-        val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: error("Couldn't open that PDF.")
+        val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: throw UserFacingException("Couldn't open that PDF.")
         descriptor.use { fd ->
             val renderer = try {
                 PdfRenderer(fd)
             } catch (e: SecurityException) {
-                throw IllegalArgumentException("That PDF is password-protected.", e)
+                throw UserFacingException("That PDF is password-protected.", e)
             }
             renderer.use { pdf ->
-                require(pdf.pageCount > 0) { "That PDF has no pages." }
+                if (pdf.pageCount == 0) throw UserFacingException("That PDF has no pages.")
                 (0 until minOf(pdf.pageCount, maxPages)).map { index ->
                     pdf.openPage(index).use { page ->
                         // PDF sizes are in points (1/72 in); render at a width OCR reads well.

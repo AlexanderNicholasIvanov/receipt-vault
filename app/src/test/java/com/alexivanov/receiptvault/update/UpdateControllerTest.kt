@@ -109,7 +109,7 @@ class UpdateControllerTest {
         error = IOException("timeout")
         c.download() // Retry
         runCurrent()
-        assertEquals(UpdateState.DownloadFailed(info, "Download failed: timeout"), c.state.value)
+        assertEquals(UpdateState.DownloadFailed(info, "Download failed. Check your internet connection and try again."), c.state.value)
         assertEquals(info, c.offered)
     }
 
