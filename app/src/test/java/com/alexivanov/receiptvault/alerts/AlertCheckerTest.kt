@@ -139,7 +139,7 @@ class AlertCheckerTest {
         val reminders = mutableListOf<Reminder>()
         val budgets = mutableListOf<BudgetUse>()
         override fun enabled() = on
-        override fun reminder(reminder: Reminder) { reminders += reminder }
-        override fun budget(use: BudgetUse, currency: String) { budgets += use }
+        override fun reminder(reminder: Reminder, hideDetails: Boolean) { reminders += reminder }
+        override fun budget(use: BudgetUse, currency: String, hideDetails: Boolean) { budgets += use }
     }
 }
