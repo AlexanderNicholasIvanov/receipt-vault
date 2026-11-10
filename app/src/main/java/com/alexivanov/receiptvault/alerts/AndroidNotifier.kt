@@ -12,9 +12,9 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.alexivanov.receiptvault.MainActivity
 import com.alexivanov.receiptvault.R
-import com.alexivanov.receiptvault.domain.BudgetLevel
+import com.alexivanov.receiptvault.domain.AlertText
+import com.alexivanov.receiptvault.domain.AlertTexts
 import com.alexivanov.receiptvault.domain.BudgetUse
-import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.Reminder
 
 class AndroidNotifier(private val context: Context) : Notifier {
@@ -34,37 +34,37 @@ class AndroidNotifier(private val context: Context) : Notifier {
         manager.areNotificationsEnabled() &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    override fun reminder(reminder: Reminder) {
+    override fun reminder(reminder: Reminder, hideDetails: Boolean) {
         post(
             id = reminder.key.hashCode(),
-            notification = NotificationCompat.Builder(context, CHANNEL_REMINDERS)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(reminder.title)
-                .setContentText(reminder.text)
-                .setContentIntent(open(reminder.receiptId))
-                .setAutoCancel(true)
-                .build(),
+            notification = build(CHANNEL_REMINDERS, AlertTexts.reminder(reminder, hideDetails), open(reminder.receiptId)),
         )
     }
 
-    override fun budget(use: BudgetUse, currency: String) {
-        val spent = Money.format(use.spentCents, currency)
-        val limit = Money.format(use.budgetCents, currency)
-        val title = when (use.level) {
-            BudgetLevel.OVER -> if (use.category == null) "Over your monthly budget" else "Over budget: ${use.label}"
-            else -> if (use.category == null) "Monthly budget almost used" else "Budget almost used: ${use.label}"
-        }
+    override fun budget(use: BudgetUse, currency: String, hideDetails: Boolean) {
         post(
             id = "budget:${use.category?.name}".hashCode(),
-            notification = NotificationCompat.Builder(context, CHANNEL_BUDGETS)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(title)
-                .setContentText("$spent of $limit spent this month.")
-                .setContentIntent(open(null))
-                .setAutoCancel(true)
-                .build(),
+            notification = build(CHANNEL_BUDGETS, AlertTexts.budget(use, currency, hideDetails), open(null)),
         )
     }
+
+    // Private: a secure lock screen shows the generic public version, never merchants or amounts.
+    private fun build(channel: String, text: AlertText, intent: PendingIntent): Notification =
+        NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(text.title)
+            .setContentText(text.text)
+            .setContentIntent(intent)
+            .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(context, channel)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentTitle(AlertTexts.lockScreen.title)
+                    .setContentText(AlertTexts.lockScreen.text)
+                    .build(),
+            )
+            .build()
 
     private fun post(id: Int, notification: Notification) {
         // Checked again here: the permission can be withdrawn at any moment.

@@ -18,8 +18,10 @@ import java.time.ZoneId
 interface Notifier {
     /** False when the user hasn't allowed notifications; nothing is marked as sent then. */
     fun enabled(): Boolean
-    fun reminder(reminder: Reminder)
-    fun budget(use: BudgetUse, currency: String)
+
+    /** [hideDetails]: app lock is on, so no merchant or amount appears even on an unlocked phone. */
+    fun reminder(reminder: Reminder, hideDetails: Boolean)
+    fun budget(use: BudgetUse, currency: String, hideDetails: Boolean)
 }
 
 /**
@@ -43,7 +45,7 @@ class AlertChecker(
 
         for (r in Reminders.due(all, today)) {
             if (r.key in sent) continue
-            notifier.reminder(r)
+            notifier.reminder(r, hideDetails = s.appLock)
             posted += r.key
         }
 
@@ -51,7 +53,7 @@ class AlertChecker(
         for (use in BudgetMath.usage(s.budgets, Conversion.toBase(all, s.activeRates), s.defaultCurrency, month, zone)) {
             val key = BudgetMath.alertKey(month, use) ?: continue
             if (key in sent) continue
-            notifier.budget(use, s.defaultCurrency)
+            notifier.budget(use, s.defaultCurrency, hideDetails = s.appLock)
             posted += key
             // Going straight past 80 % to over budget sends one warning, not two.
             if (use.level == BudgetLevel.OVER) {
