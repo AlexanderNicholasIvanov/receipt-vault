@@ -47,4 +47,13 @@ class PageLayoutTest {
         assertEquals(emptyList<String>(), PageUris.decode(null))
         assertEquals(listOf("content://one"), PageUris.decode("content://one"))
     }
+
+    @Test
+    fun `PDF pages are enlarged to read well but never beyond the memory cap`() {
+        assertEquals(2f, PdfRaster.scale(800, 1100, 1600), 0.001f)
+        assertEquals("already wide enough", 1f, PdfRaster.scale(2000, 3000, 1600), 0.001f)
+        val huge = PdfRaster.scale(14_400, 14_400, 1600)
+        assertTrue(huge < 1f)
+        assertTrue(14_400 * huge * 14_400 * huge <= PdfRaster.MAX_PIXELS * 1.01f)
+    }
 }

@@ -57,14 +57,14 @@ class QuickCaptureFlowTest {
             pressBack()
             compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 5_000)
             compose.onNodeWithText("Discard").performClick()
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
 
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
             compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
             compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
             pressBack()
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             compose.onNodeWithText("Discard this receipt?").assertDoesNotExist()
         }
     }
@@ -80,7 +80,7 @@ class QuickCaptureFlowTest {
     @Test
     fun `a shortcut tapped during an unsaved receipt asks before discarding it`() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
             compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()

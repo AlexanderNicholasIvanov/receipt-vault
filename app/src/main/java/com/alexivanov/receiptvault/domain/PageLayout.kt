@@ -1,6 +1,7 @@
 package com.alexivanov.receiptvault.domain
 
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * How several scanned pages are stacked into one tall image: every page is
@@ -38,4 +39,15 @@ data class PageLayout(val width: Int, val pageHeights: List<Int>) {
 object PageUris {
     fun encode(uris: List<String>): String = uris.joinToString("\n")
     fun decode(arg: String?): List<String> = arg.orEmpty().split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+}
+
+/** How much to enlarge a PDF page so text reads well, within what a phone's memory can hold. */
+object PdfRaster {
+    /** About 100 MB as a bitmap; a page in a crafted PDF can claim to be any size. */
+    const val MAX_PIXELS = 25_000_000f
+
+    fun scale(width: Int, height: Int, targetWidth: Int): Float {
+        val wanted = (targetWidth.toFloat() / width).coerceIn(1f, 4f)
+        return minOf(wanted, sqrt(MAX_PIXELS / (width.toLong() * height)))
+    }
 }

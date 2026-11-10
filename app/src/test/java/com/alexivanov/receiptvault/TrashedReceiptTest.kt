@@ -13,6 +13,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.alexivanov.receiptvault.data.AppDatabase
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.ui.review.ReviewState
 import com.alexivanov.receiptvault.ui.review.ReviewViewModel
@@ -85,6 +86,21 @@ class TrashedReceiptTest {
         assertEquals("Corner Cafe Downtown", saved?.merchant)
         assertNotNull("still in the trash", saved?.deletedAt)
         assertTrue(runBlocking { app.receipts.getAll() }.isEmpty())
+    }
+
+    @Test
+    fun `a failed save keeps the form open and explains`() {
+        val vm = ReviewViewModel(app, SavedStateHandle())
+        waitFor { vm.state.value is ReviewState.Editing }
+        vm.edit { it.copy(merchant = "Kiosk", total = "3.50") }
+        AppContainer::class.java.getDeclaredField("database").apply { isAccessible = true }
+            .let { (it.get(app) as AppDatabase).close() }
+
+        vm.save(allowDuplicate = true)
+        waitFor { (vm.state.value as ReviewState.Editing).error != null }
+
+        assertTrue((vm.state.value as ReviewState.Editing).error!!.startsWith("Couldn't save"))
+        assertEquals("Kiosk", (vm.state.value as ReviewState.Editing).draft.merchant)
     }
 
     private fun waitFor(condition: () -> Boolean) {

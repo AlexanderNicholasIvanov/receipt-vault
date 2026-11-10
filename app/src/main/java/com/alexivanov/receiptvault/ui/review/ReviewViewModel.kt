@@ -17,6 +17,7 @@ import com.alexivanov.receiptvault.domain.ParsedReceipt
 import com.alexivanov.receiptvault.domain.ReceiptParser
 import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.scan.PdfPages
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -218,6 +219,10 @@ class ReviewViewModel(
             val what = if (fromPdf) "PDF" else "photo"
             _state.value = ReviewState.Failed("Could not open that $what: ${e.message ?: "unknown error"}")
             return
+        } catch (e: OutOfMemoryError) {
+            pages.forEach { app.images.delete(it.absolutePath) }
+            _state.value = ReviewState.Failed("That file is too large to open on this phone.")
+            return
         }
 
         var notice: String? = null
@@ -365,6 +370,12 @@ class ReviewViewModel(
                 _saved.value = app.receipts.save(receipt, items)
                 handle.remove<String>(KEY_DRAFT)
                 app.checkAlertsSoon()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    if (it is ReviewState.Editing) it.copy(error = "Couldn't save this receipt. Check that the phone has free space, then try again.") else it
+                }
             } finally {
                 saving = false
             }

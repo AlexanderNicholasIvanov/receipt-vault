@@ -66,9 +66,9 @@ class AppLockTest {
     fun `an unlocked session survives activity recreation`() {
         AppLockSession.unlocked = true
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             scenario.recreate()
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             compose.onNodeWithText("Receipt Vault is locked").assertDoesNotExist()
         }
     }
@@ -79,7 +79,7 @@ class AppLockTest {
     fun `a copy of the app opened by a share locks the original too`() {
         AppLockSession.unlocked = true
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             scenario.moveToState(Lifecycle.State.CREATED)
             shadowOf(Looper.getMainLooper()).idleFor(61, TimeUnit.SECONDS)
 
@@ -109,7 +109,7 @@ class AppLockTest {
     fun `a popup is hidden while locked and comes back after unlocking`() {
         AppLockSession.unlocked = true
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
             compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
 
@@ -126,7 +126,7 @@ class AppLockTest {
     fun `back on the lock screen leaves the hidden screens alone`() {
         AppLockSession.unlocked = true
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+            compose.waitForEmptyHome()
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
             compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
