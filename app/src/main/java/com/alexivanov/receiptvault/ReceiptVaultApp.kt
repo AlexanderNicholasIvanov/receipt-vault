@@ -2,11 +2,14 @@ package com.alexivanov.receiptvault
 
 import android.app.Application
 import android.content.Context
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.alexivanov.receiptvault.alerts.AlertChecker
 import com.alexivanov.receiptvault.alerts.AlertWorker
 import com.alexivanov.receiptvault.alerts.AndroidNotifier
 import com.alexivanov.receiptvault.data.AppDatabase
 import com.alexivanov.receiptvault.data.BackupManager
+import com.alexivanov.receiptvault.data.BackupTasks
 import com.alexivanov.receiptvault.data.ExchangeRateRepository
 import com.alexivanov.receiptvault.data.FrankfurterRateSource
 import com.alexivanov.receiptvault.data.ReceiptRepository
@@ -45,6 +48,11 @@ class AppContainer(val context: Context) {
     val receipts = ReceiptRepository(database.receiptDao(), images)
     val settings = SettingsRepository(context)
     val backup = BackupManager(receipts, images, context.cacheDir, BuildConfig.VERSION_NAME)
+
+    /** Backups and restores outlive the Settings screen; a result nobody saw becomes a toast. */
+    val backupTasks = BackupTasks(appScope) { message ->
+        ContextCompat.getMainExecutor(context).execute { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+    }
     val textReader = TextReader(context)
     val pdfPages = PdfPages(context)
     val alerts = AlertChecker(receipts, settings, AndroidNotifier(context))
