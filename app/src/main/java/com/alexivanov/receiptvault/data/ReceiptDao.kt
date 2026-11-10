@@ -51,6 +51,10 @@ interface ReceiptDao {
     @Query("SELECT line_items.* FROM line_items JOIN receipts ON receipts.id = line_items.receiptId WHERE receipts.deletedAt IS NULL")
     suspend fun getAllItems(): List<LineItem>
 
+    /** Item names of receipts not in the trash, for search. */
+    @Query("SELECT line_items.receiptId AS receiptId, line_items.name AS name FROM line_items JOIN receipts ON receipts.id = line_items.receiptId WHERE receipts.deletedAt IS NULL")
+    fun observeItemNames(): Flow<List<ItemName>>
+
     @Query("SELECT * FROM line_items WHERE receiptId IN (:ids)")
     suspend fun getItemsFor(ids: List<Long>): List<LineItem>
 
@@ -80,3 +84,5 @@ interface ReceiptDao {
         return id
     }
 }
+
+data class ItemName(val receiptId: Long, val name: String)

@@ -8,18 +8,20 @@ import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.BudgetMath
 import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.BudgetUse
-import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.CsvExport
 import com.alexivanov.receiptvault.domain.ExpenseReport
+import com.alexivanov.receiptvault.domain.PhotoDownload
 import com.alexivanov.receiptvault.report.PdfReportWriter
 import com.alexivanov.receiptvault.domain.ImageNames
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.ReceiptFilter
+import com.alexivanov.receiptvault.domain.ReceiptSearch
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.update.UpdateController
 import com.alexivanov.receiptvault.update.UpdateState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,11 +84,11 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
 
     fun undoOffered(ids: List<Long>) = app.receipts.undoOffered(ids)
 
-    val ui: StateFlow<HomeUi> = combine(app.receipts.receipts, listOptions, visibleUpdate, app.settings.settings) { all, (p, q, f), update, settings ->
+    val ui: StateFlow<HomeUi> = combine(app.receipts.receipts, app.receipts.itemText, listOptions, visibleUpdate, app.settings.settings) { all, items, (p, q, f), update, settings ->
         // A custom date range replaces the period chips.
         val inPeriod = if (f.hasDates) all else Insights.inPeriod(all, p, LocalDate.now())
         val needle = q.trim().lowercase()
-        val searched = if (needle.isEmpty()) inPeriod else inPeriod.filter { r -> matches(r, needle) }
+        val searched = if (needle.isEmpty()) inPeriod else inPeriod.filter { r -> ReceiptSearch.matches(r, needle, items[r.id]) }
         val filtered = f.apply(searched)
         HomeUi(
             loading = false,
@@ -158,14 +160,22 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
         }
     }
 
-    /** Saves the photos of the selected receipts to Pictures; returns how many were saved. */
-    suspend fun downloadSelectedPhotos(): Int {
+    /** Saves the photos of the selected receipts to Pictures. */
+    suspend fun downloadSelectedPhotos(): PhotoDownload {
         var saved = 0
+        var failed = 0
         for (r in app.receipts.getByIds(_selected.value.toList())) {
             val path = r.imagePath ?: continue
-            if (runCatching { app.images.saveToPictures(path, ImageNames.forReceipt(r.merchant, r.purchasedAt)) }.isSuccess) saved++
+            try {
+                app.images.saveToPictures(path, ImageNames.forReceipt(r.merchant, r.purchasedAt))
+                saved++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed++
+            }
         }
-        return saved
+        return PhotoDownload(saved, failed)
     }
 
     fun setPeriod(p: Period) {
@@ -183,12 +193,4 @@ class HomeViewModel(private val app: AppContainer) : ViewModel() {
     private companion object {
         const val SEARCH_PAUSE_MS = 200L
     }
-
-    private fun matches(r: Receipt, needle: String): Boolean =
-        r.merchant.lowercase().contains(needle) ||
-            Category.fromName(r.category).label.lowercase().contains(needle) ||
-            r.notes.lowercase().contains(needle) ||
-            r.tags.lowercase().contains(needle) ||
-            r.address.orEmpty().lowercase().contains(needle) ||
-            r.ocrText.lowercase().contains(needle)
 }

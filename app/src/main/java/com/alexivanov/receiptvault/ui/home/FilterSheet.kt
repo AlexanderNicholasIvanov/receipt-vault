@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -48,14 +49,15 @@ import java.time.ZoneOffset
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterSheet(current: ReceiptFilter, tagsInUse: List<String>, onApply: (ReceiptFilter) -> Unit, onDismiss: () -> Unit) {
-    var sort by remember { mutableStateOf(current.sort) }
-    var categories by remember { mutableStateOf(current.categories) }
-    var tags by remember { mutableStateOf(current.tags) }
-    var min by remember { mutableStateOf(current.minCents?.let(::plain).orEmpty()) }
-    var max by remember { mutableStateOf(current.maxCents?.let(::plain).orEmpty()) }
-    var from by remember { mutableStateOf(current.from) }
-    var to by remember { mutableStateOf(current.to) }
-    var pickDates by remember { mutableStateOf(false) }
+    // Saveable, so turning the phone keeps choices not yet applied.
+    var sort by rememberSaveable { mutableStateOf(current.sort) }
+    var categories by rememberSaveable { mutableStateOf(current.categories) }
+    var tags by rememberSaveable { mutableStateOf(current.tags) }
+    var min by rememberSaveable { mutableStateOf(current.minCents?.let(::plain).orEmpty()) }
+    var max by rememberSaveable { mutableStateOf(current.maxCents?.let(::plain).orEmpty()) }
+    var from by rememberSaveable { mutableStateOf(current.from) }
+    var to by rememberSaveable { mutableStateOf(current.to) }
+    var pickDates by rememberSaveable { mutableStateOf(false) }
 
     // The choices above are kept, so the sheet comes back as it was after unlocking.
     if (LocalAppLocked.current) return
