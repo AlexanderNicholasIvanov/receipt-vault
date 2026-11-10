@@ -78,23 +78,25 @@ class TrashTest {
     }
 
     @Test
-    fun `startup purge deletes receipts and photos trashed over 30 days ago and keeps newer ones`() = runBlocking {
-        val oldPhoto = photo("old")
-        val newPhoto = photo("new")
+    fun `trashed receipts and their photos are kept however long ago they were deleted`() = runBlocking {
+        // Old enough that the photo sweep would take it if no receipt claimed it.
+        val oldPhoto = photo("old").apply { setLastModified(System.currentTimeMillis() - 365 * day) }
         val old = add("Old", oldPhoto)
-        val recent = add("Recent", newPhoto)
-        val kept = add("Kept")
-        repo.moveToTrash(listOf(old), now - 31 * day)
-        repo.moveToTrash(listOf(recent), now - 29 * day)
+        val recent = add("Recent")
+        repo.moveToTrash(listOf(old), now - 5 * 365 * day)
+        repo.moveToTrash(listOf(recent), now - day)
 
-        assertEquals(1, repo.purgeExpiredTrash(now))
+        // What the app does at every start: only photos that belong to no receipt are swept.
+        repo.sweepOrphanImages()
 
+        assertEquals(setOf("Old", "Recent"), repo.trash.first().map { it.merchant }.toSet())
+        assertTrue(oldPhoto.exists())
+
+        // Only the user removes them for good.
+        repo.emptyTrash()
+        assertTrue(repo.trash.first().isEmpty())
         assertNull(repo.get(old))
-        assertTrue(repo.getItems(old).isEmpty())
         assertFalse(oldPhoto.exists())
-        assertEquals(listOf("Recent"), repo.trash.first().map { it.merchant })
-        assertTrue(newPhoto.exists())
-        assertEquals(listOf(kept), repo.getAll().map { it.id })
     }
 
     @Test
