@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.ExchangeRates
@@ -288,6 +290,41 @@ class AppSmokeTest {
         compose.onNodeWithText("Recurring: $15.99 a month from 1 regular payment").assertExists()
         compose.onNodeWithText("Recurring costs").assertExists()
         compose.onNodeWithText("Every month · usually $15.99", substring = true).assertExists()
+    }
+
+    @Test
+    fun `a category shows what is usually bought and where`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        runBlocking {
+            app.settings.setDefaultCurrency("USD")
+            val now = System.currentTimeMillis()
+            listOf(349L, 379L).forEach { milk ->
+                app.receipts.save(
+                    Receipt(merchant = "Kroger", category = Category.GROCERIES.name, totalCents = milk + 129, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now),
+                    listOf(
+                        LineItem(receiptId = 0, position = 0, name = "Milk 1 gal", priceCents = milk),
+                        LineItem(receiptId = 0, position = 1, name = "Bananas", priceCents = 129),
+                    ),
+                )
+            }
+        }
+        compose.waitUntilAtLeastOneExists(hasText("Kroger"), 10_000)
+
+        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Monthly cost"), 5_000)
+        compose.onAllNodesWithText("🛒 Groceries")[0].performClick()
+        compose.waitUntilAtLeastOneExists(hasText("What you usually buy here"), 5_000)
+        compose.onNodeWithText("You usually pay").assertExists()
+        compose.onNodeWithText("Milk 1 gal").assertExists()
+        compose.onNodeWithText("Bought 2 times · $3.49–$3.79", substring = true).assertExists()
+        compose.onNodeWithText("2 visits · usually", substring = true).assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+
+        compose.waitUntilAtLeastOneExists(hasText("See everything you buy"), 5_000)
+        compose.onNodeWithText("See everything you buy").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Everything you buy"), 5_000)
+        compose.onNodeWithText("Bananas").assertExists()
     }
 
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {

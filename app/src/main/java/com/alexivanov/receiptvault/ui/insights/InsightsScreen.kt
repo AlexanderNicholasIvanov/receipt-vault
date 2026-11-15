@@ -1,6 +1,7 @@
 package com.alexivanov.receiptvault.ui.insights
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,6 +36,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -51,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
+import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Insights
@@ -66,7 +70,7 @@ import java.time.format.TextStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InsightsScreen(onBack: () -> Unit) {
+fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val all by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -96,7 +100,7 @@ fun InsightsScreen(onBack: () -> Unit) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { MonthlyCostCard(costs) }
+            item { MonthlyCostCard(costs, onCategory) }
             if (costs.receipts > 0) {
                 item { SectionTitle("Recurring costs") }
                 item { RecurringCosts(costs) }
@@ -121,7 +125,7 @@ fun InsightsScreen(onBack: () -> Unit) {
             item { StatsGrid(summary) }
             if (summary.byCategory.isNotEmpty()) {
                 item { SectionTitle("By category") }
-                item { Breakdown(summary.byCategory.map { (c, v) -> "${c.emoji} ${c.label}" to v }, summary) }
+                item { Breakdown(summary.byCategory.map { (c, v) -> "${c.emoji} ${c.label}" to v }, summary, onClick = { i -> onCategory(summary.byCategory[i].first) }) }
             }
             if (summary.topMerchants.isNotEmpty()) {
                 item { SectionTitle("Top merchants") }
@@ -161,12 +165,12 @@ private fun StatsGrid(s: Summary) {
 
 /** Single-hue horizontal magnitude bars; the label and value text carry identity, not color. */
 @Composable
-private fun Breakdown(rows: List<Pair<String, Long>>, s: Summary) {
+private fun Breakdown(rows: List<Pair<String, Long>>, s: Summary, onClick: ((Int) -> Unit)? = null) {
     val max = rows.maxOfOrNull { it.second }?.coerceAtLeast(1) ?: 1
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            rows.forEach { (label, value) ->
-                Column {
+            rows.forEachIndexed { i, (label, value) ->
+                Column(if (onClick != null) Modifier.clickable(onClickLabel = "See the breakdown") { onClick(i) } else Modifier) {
                     Row {
                         Text(label, Modifier.weight(1f))
                         val share = if (s.totalCents > 0) " · %.0f%%".format(100.0 * value / s.totalCents) else ""
@@ -265,7 +269,7 @@ private fun MonthlyBars(data: List<Pair<YearMonth, Long>>, currency: String) {
  * over the months, then the same per category with how often it comes up.
  */
 @Composable
-private fun MonthlyCostCard(c: MonthlyCosts) {
+private fun MonthlyCostCard(c: MonthlyCosts, onCategory: (Category?) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Monthly cost", style = MaterialTheme.typography.titleMedium)
@@ -304,7 +308,7 @@ private fun MonthlyCostCard(c: MonthlyCosts) {
             val max = c.byCategory.maxOfOrNull { it.monthlyCents }?.coerceAtLeast(1) ?: 1
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 c.byCategory.forEach { line ->
-                    Column {
+                    Column(Modifier.clickable(onClickLabel = "See the breakdown") { onCategory(line.category) }) {
                         Row {
                             Text("${line.category.emoji} ${line.category.label}", Modifier.weight(1f))
                             Text("${money(line.monthlyCents, c.currency)} a month", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -325,6 +329,7 @@ private fun MonthlyCostCard(c: MonthlyCosts) {
                     }
                 }
             }
+            TextButton(onClick = { onCategory(null) }, modifier = Modifier.align(Alignment.End)) { Text("See everything you buy") }
         }
     }
 }
