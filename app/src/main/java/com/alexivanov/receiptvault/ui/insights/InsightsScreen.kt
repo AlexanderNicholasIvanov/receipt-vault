@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,9 +52,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.Conversion
+import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Insights
+import com.alexivanov.receiptvault.domain.MonthlyCosts
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.Summary
+import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import java.time.LocalDate
@@ -75,6 +79,7 @@ fun InsightsScreen(onBack: () -> Unit) {
         Insights.summarize(Insights.inPeriod(all, period, today), settings.defaultCurrency, rates)
     }
     val monthly = remember(all, summary.currency, rates) { Insights.monthly(Conversion.toBase(all, rates), summary.currency, today) }
+    val costs = remember(all, settings.defaultCurrency, rates) { CostEstimate.monthly(all, settings.defaultCurrency, today, rates) }
 
     Scaffold(
         topBar = {
@@ -91,6 +96,11 @@ fun InsightsScreen(onBack: () -> Unit) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item { MonthlyCostCard(costs) }
+            if (costs.receipts > 0) {
+                item { SectionTitle("Recurring costs") }
+                item { RecurringCosts(costs) }
+            }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
@@ -249,3 +259,102 @@ private fun MonthlyBars(data: List<Pair<YearMonth, Long>>, currency: String) {
     }
 }
 
+
+/**
+ * The answer to "what do I spend in a month": everything since the first receipt, spread evenly
+ * over the months, then the same per category with how often it comes up.
+ */
+@Composable
+private fun MonthlyCostCard(c: MonthlyCosts) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Monthly cost", style = MaterialTheme.typography.titleMedium)
+            if (c.since == null) {
+                Text(
+                    "Add receipts to see what your expenses come to in an average month.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                return@Column
+            }
+            Text("${money(c.monthlyCents, c.currency)} a month", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                "About ${money(c.yearlyCents, c.currency)} a year at this rate. " +
+                    "Average of ${c.receipts} ${if (c.receipts == 1) "receipt" else "receipts"} since ${formatDate(c.since)}.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (c.recurring.isNotEmpty()) {
+                Text(
+                    "Recurring: ${money(c.recurringMonthlyCents, c.currency)} a month from ${c.recurring.size} regular " +
+                        if (c.recurring.size == 1) "payment" else "payments",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (c.otherCurrencyCount > 0) {
+                Text(
+                    "${c.otherCurrencyCount} ${if (c.otherCurrencyCount == 1) "receipt" else "receipts"} in other currencies not included.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+            val max = c.byCategory.maxOfOrNull { it.monthlyCents }?.coerceAtLeast(1) ?: 1
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                c.byCategory.forEach { line ->
+                    Column {
+                        Row {
+                            Text("${line.category.emoji} ${line.category.label}", Modifier.weight(1f))
+                            Text("${money(line.monthlyCents, c.currency)} a month", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(
+                            CostEstimate.howOften(line.timesPerMonth),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { line.monthlyCents.toFloat() / max },
+                            modifier = Modifier.fillMaxWidth().height(6.dp),
+                            strokeCap = StrokeCap.Round,
+                            drawStopIndicator = {},
+                            gapSize = 2.dp,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Merchants paid at a steady pace, with their usual amount and when the next one is due. */
+@Composable
+private fun RecurringCosts(c: MonthlyCosts) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (c.recurring.isEmpty()) {
+                Text(
+                    "Nothing repeats regularly yet. A place you pay at a steady pace, " +
+                        "${CostEstimate.MIN_PAYMENTS} or more times, shows up here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            c.recurring.forEach { r ->
+                Column {
+                    Row {
+                        Text("${r.category.emoji} ${r.merchant}", Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                        Text("${money(r.monthlyCents, c.currency)} a month", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(
+                        "${CostEstimate.everyLabel(r.everyDays)} · usually ${money(r.typicalCents, c.currency)} · next around ${formatDate(r.nextDate)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}

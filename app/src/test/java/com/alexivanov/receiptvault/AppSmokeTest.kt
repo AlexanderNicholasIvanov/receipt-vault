@@ -265,6 +265,31 @@ class AppSmokeTest {
         }
     }
 
+    @Test
+    fun `insights show the monthly cost and recurring payments`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        runBlocking {
+            app.settings.setDefaultCurrency("USD")
+            val today = LocalDate.now()
+            listOf(60L, 30L, 0L).forEach { daysAgo ->
+                val at = today.minusDays(daysAgo).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                app.receipts.save(
+                    Receipt(merchant = "Netflix", category = Category.ENTERTAINMENT.name, totalCents = 1599, currency = "USD", purchasedAt = at, createdAt = at, updatedAt = at),
+                    emptyList(),
+                )
+            }
+        }
+        compose.waitUntilAtLeastOneExists(hasText("Netflix"), 10_000)
+
+        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Monthly cost"), 5_000)
+        compose.onNodeWithText("Average of 3 receipts since", substring = true).assertExists()
+        compose.onNodeWithText("Recurring: $15.99 a month from 1 regular payment").assertExists()
+        compose.onNodeWithText("Recurring costs").assertExists()
+        compose.onNodeWithText("Every month · usually $15.99", substring = true).assertExists()
+    }
+
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
