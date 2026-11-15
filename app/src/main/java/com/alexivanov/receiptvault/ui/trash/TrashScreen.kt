@@ -35,13 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.Receipt
-import com.alexivanov.receiptvault.domain.TrashPolicy
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.money
 import kotlinx.coroutines.launch
 
-/** Deleted receipts, kept for [TrashPolicy.RETENTION_DAYS] days so a slip of the thumb is never final. */
+/** Deleted receipts, kept until the user restores them or deletes them for good. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrashScreen(onBack: () -> Unit) {
@@ -69,7 +68,7 @@ fun TrashScreen(onBack: () -> Unit) {
         LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
             item {
                 Text(
-                    "Deleted receipts are removed for good after ${TrashPolicy.RETENTION_DAYS} days.",
+                    "Deleted receipts stay here until you restore them or delete them for good.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -86,14 +85,12 @@ fun TrashScreen(onBack: () -> Unit) {
                 }
             }
             items(list, key = { it.id }) { r ->
-                val now = System.currentTimeMillis()
-                val days = TrashPolicy.daysLeft(r.deletedAt ?: now, now)
                 ListItem(
                     headlineContent = { Text(r.merchant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = {
                         Text(
-                            "${formatDate(r.purchasedAt)} · ${money(r.totalCents, r.currency)} · " +
-                                if (days <= 1) "deleted tomorrow" else "$days days left",
+                            "${formatDate(r.purchasedAt)} · ${money(r.totalCents, r.currency)}" +
+                                (r.deletedAt?.let { " · deleted ${formatDate(it)}" } ?: ""),
                         )
                     },
                 )

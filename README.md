@@ -51,7 +51,7 @@ Updates install over the old version and keep your receipts. If the installed co
 - **Settings → Monthly budgets**: a limit for everything and/or per category. Home shows what's left this month, and you get a notification at 80 % and when a budget is used up.
 - **Settings → Convert other currencies** (off by default): receipts in other currencies are added to totals, Insights and budgets at daily European Central Bank rates. Each receipt keeps its own currency; only the sums are converted. Rates are cached, so it keeps working offline.
 - **Long-press** a receipt to select several, then delete them, or use **⋮** to make an expense report, export them to CSV or download their photos.
-- Deleting asks nothing: you get an **Undo** button, and deleted receipts wait in **Settings → Trash** for 30 days before they're removed for good.
+- Deleting asks nothing: you get an **Undo** button, and deleted receipts stay in **Settings → Trash** until you restore them or delete them for good. Nothing is ever deleted automatically.
 
 ## Development
 

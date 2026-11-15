@@ -96,10 +96,11 @@ class AppSmokeTest {
 
         // The trash lists it and can put it back.
         compose.onNodeWithContentDescription("Settings").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("1 deleted receipt, kept for 30 days."), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("1 deleted receipt."), 5_000)
         compose.onNodeWithText("Trash", useUnmergedTree = true).performScrollTo().performClick()
         compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 5_000)
-        compose.onNodeWithText("30 days left", substring = true).assertExists()
+        compose.onNodeWithText("Deleted receipts stay here until you restore them or delete them for good.").assertExists()
+        compose.onNodeWithText(" · deleted ", substring = true).assertExists()
         compose.onNodeWithText("Restore").performClick()
         compose.waitUntilAtLeastOneExists(hasText("The trash is empty."), 5_000)
     }

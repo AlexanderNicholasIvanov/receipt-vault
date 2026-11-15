@@ -32,9 +32,6 @@ interface ReceiptDao {
     @Query("SELECT * FROM receipts WHERE id IN (:ids)")
     suspend fun getByIds(ids: List<Long>): List<Receipt>
 
-    @Query("SELECT * FROM receipts WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
-    suspend fun getTrashedBefore(cutoff: Long): List<Receipt>
-
     @Query("SELECT * FROM receipts WHERE deletedAt IS NOT NULL")
     suspend fun getTrash(): List<Receipt>
 
