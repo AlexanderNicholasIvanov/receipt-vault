@@ -60,9 +60,13 @@ import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.MonthlyCosts
 import com.alexivanov.receiptvault.domain.Period
+import com.alexivanov.receiptvault.domain.Retirement
+import com.alexivanov.receiptvault.domain.RetirementEstimate
+import com.alexivanov.receiptvault.domain.RetirementPlan
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
+import com.alexivanov.receiptvault.ui.roughMoney
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import java.time.LocalDate
 import java.time.YearMonth
@@ -70,7 +74,7 @@ import java.time.format.TextStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}) {
+fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onRetirement: () -> Unit = {}) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val all by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -101,6 +105,12 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { MonthlyCostCard(costs, onCategory) }
+            if (costs.receipts > 0) {
+                item {
+                    val estimate = remember(costs, settings.retirement) { Retirement.estimate(settings.retirement, costs.byCategory, today.year) }
+                    RetirementCard(estimate, settings.retirement, costs.currency, onRetirement)
+                }
+            }
             if (costs.receipts > 0) {
                 item { SectionTitle("Recurring costs") }
                 item { RecurringCosts(costs) }
@@ -359,6 +369,34 @@ private fun RecurringCosts(c: MonthlyCosts) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+        }
+    }
+}
+
+/** A way into the retirement estimate, with its answer once the user's age is known. */
+@Composable
+private fun RetirementCard(e: RetirementEstimate, plan: RetirementPlan, currency: String, onOpen: () -> Unit) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Retirement", style = MaterialTheme.typography.titleMedium)
+            if (e.age == null) {
+                Text(
+                    "Estimate how much you'd need to retire, based on what your receipts show you spend.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    "About ${roughMoney(e.neededCents, currency)} by age ${plan.retireAge}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${roughMoney(e.neededTodayCents, currency)} in today's money, to last until ${plan.planToAge}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

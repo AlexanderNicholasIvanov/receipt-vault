@@ -15,6 +15,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.alexivanov.receiptvault.domain.Budgets
 import com.alexivanov.receiptvault.domain.ExchangeRates
 import com.alexivanov.receiptvault.domain.Money
+import com.alexivanov.receiptvault.domain.RetirementPlan
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -46,6 +47,8 @@ data class AppSettings(
     val convertCurrencies: Boolean = false,
     /** Last downloaded rates, kept for offline use. */
     val exchangeRates: ExchangeRates? = null,
+    /** Age, savings and assumptions for the retirement estimate. */
+    val retirement: RetirementPlan = RetirementPlan(),
 ) {
     /** The rates to convert with right now: on, downloaded, and for the current default currency. */
     val activeRates: ExchangeRates?
@@ -65,6 +68,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     private val sentAlerts = stringSetPreferencesKey("sent_alerts")
     private val convertKey = booleanPreferencesKey("convert_currencies")
     private val ratesKey = stringPreferencesKey("exchange_rates")
+    private val retirementKey = stringPreferencesKey("retirement_plan")
 
     // A read error (rare: storage trouble) shows defaults rather than crashing the screen.
     val settings: Flow<AppSettings> = store.data.catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }.map { p ->
@@ -79,6 +83,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             budgets = Budgets.decode(p[budgetsKey]),
             convertCurrencies = p[convertKey] ?: false,
             exchangeRates = ExchangeRates.decode(p[ratesKey]),
+            retirement = RetirementPlan.decode(p[retirementKey]),
         )
     }
 
@@ -100,6 +105,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setAppLock(value: Boolean) = store.edit { it[appLockKey] = value }
     suspend fun setLastBackupAt(value: Long) = store.edit { it[lastBackup] = value }
     suspend fun setBudgets(value: Budgets) = store.edit { it[budgetsKey] = value.encode() }
+    suspend fun setRetirementPlan(value: RetirementPlan) = store.edit { it[retirementKey] = value.encode() }
     suspend fun setConvertCurrencies(value: Boolean) = store.edit { it[convertKey] = value }
     suspend fun setExchangeRates(value: ExchangeRates?) = store.edit {
         if (value == null) it.remove(ratesKey) else it[ratesKey] = value.encode()

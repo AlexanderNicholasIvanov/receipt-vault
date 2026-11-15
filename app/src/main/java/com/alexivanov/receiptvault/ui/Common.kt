@@ -34,6 +34,9 @@ inline fun <reified VM : ViewModel> appViewModel(crossinline create: (AppContain
 
 fun money(cents: Long, currency: String): String = Money.format(cents, currency)
 
+/** Whole units only, for rough estimates. */
+fun roughMoney(cents: Long, currency: String): String = Money.formatWhole(cents, currency)
+
 private val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
 private val timeFormat = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
