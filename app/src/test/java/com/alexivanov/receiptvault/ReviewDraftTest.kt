@@ -159,7 +159,7 @@ class ReviewDraftTest {
     }
 
     private fun waitFor(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
+        val deadline = System.currentTimeMillis() + UI_WAIT
         while (!condition()) {
             assertTrue("timed out", System.currentTimeMillis() < deadline)
             shadowOf(Looper.getMainLooper()).idle()

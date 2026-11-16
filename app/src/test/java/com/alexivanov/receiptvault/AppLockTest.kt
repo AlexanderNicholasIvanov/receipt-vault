@@ -54,7 +54,7 @@ class AppLockTest {
     @Test
     fun `locked app shows only the lock screen`() {
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), UI_WAIT)
             compose.onNodeWithText("Unlock").assertExists()
             // The home screen is composed underneath but hidden from the screen and accessibility.
             compose.onNodeWithText("No receipts yet").assertDoesNotExist()
@@ -87,7 +87,7 @@ class AppLockTest {
             shareCopy.pause().stop().destroy()
 
             scenario.moveToState(Lifecycle.State.RESUMED)
-            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), UI_WAIT)
             compose.onNodeWithText("No receipts yet").assertDoesNotExist()
         }
     }
@@ -111,14 +111,14 @@ class AppLockTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForEmptyHome()
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
 
             compose.runOnUiThread { AppLockSession.unlocked = false }
-            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), 5_000)
-            compose.waitUntilDoesNotExist(hasText("Enter manually"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), UI_WAIT)
+            compose.waitUntilDoesNotExist(hasText("Enter manually"), UI_WAIT)
 
             compose.runOnUiThread { AppLockSession.unlocked = true }
-            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
         }
     }
 
@@ -128,18 +128,18 @@ class AppLockTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.waitForEmptyHome()
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
             compose.onNodeWithText("Merchant").performTextInput("Half typed")
 
             compose.runOnUiThread { AppLockSession.unlocked = false }
-            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Receipt Vault is locked"), UI_WAIT)
             scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
             compose.waitForIdle()
 
             compose.runOnUiThread { AppLockSession.unlocked = true }
-            compose.waitUntilAtLeastOneExists(hasText("Half typed"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Half typed"), UI_WAIT)
         }
     }
 }
