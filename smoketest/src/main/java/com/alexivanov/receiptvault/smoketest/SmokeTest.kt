@@ -137,8 +137,8 @@ class SmokeTest {
     private fun label(text: String): BySelector =
         By.text(Pattern.compile(Pattern.quote(text) + """(\W.*)?""", Pattern.DOTALL))
 
-    /** One of the places in the navigation bar; the screen's own title has the same text but can't be tapped. */
-    private fun place(name: String): BySelector = By.text(name).clickable(true)
+    /** One of the places in the navigation bar: the tappable item holding the label, not the screen title of the same name. */
+    private fun place(name: String): BySelector = By.clickable(true).hasDescendant(By.text(name))
 
     /** Taps the text field labelled [name] and types into it. */
     private fun type(name: String, text: String) {
