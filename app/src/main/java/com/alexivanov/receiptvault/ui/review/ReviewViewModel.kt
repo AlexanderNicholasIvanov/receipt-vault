@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -153,6 +154,8 @@ class ReviewViewModel(
     private val memory: StateFlow<Map<String, Category>> = app.receipts.receipts
         .map { CategoryMemory.learn(it) }
         .flowOn(Dispatchers.Default)
+        // Only a convenience: if the database fails, the form keeps working without it.
+        .catch { Log.w(TAG, "Couldn't learn categories", it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     init {
@@ -286,7 +289,14 @@ class ReviewViewModel(
             joinPages(pages) { notice = notice ?: it }
         }
 
-        val learned = withContext(Dispatchers.Default) { CategoryMemory.learn(app.receipts.receipts.first()) }
+        val learned = try {
+            withContext(Dispatchers.Default) { CategoryMemory.learn(app.receipts.receipts.first()) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't learn categories", e)
+            emptyMap()
+        }
         _state.value = withLearned(
             ReviewState.Editing(
                 draft = parsed.toDraft(settings.defaultCurrency),
