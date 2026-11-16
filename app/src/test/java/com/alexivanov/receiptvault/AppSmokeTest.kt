@@ -392,13 +392,13 @@ class AppSmokeTest {
             list.performScrollToNode(hasText("A range, not one number"))
             compose.onNodeWithText("Comfortable").assertExists()
             list.performScrollToNode(hasText("At 67"))
-            compose.onNodeWithText("At 67").performClick()
+            compose.onNodeWithText("At 67").performScrollTo().performClick()
             list.performScrollToIndex(0)
             compose.waitUntilAtLeastOneExists(hasText("when you retire at 67, in 27 years", substring = true), 5_000)
 
             // A US healthcare figure, in one tap.
             list.performScrollToNode(hasText("Use about", substring = true))
-            compose.onNodeWithText("Use about", substring = true).performClick()
+            compose.onNodeWithText("Use about", substring = true).performScrollTo().performClick()
             compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
 
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
