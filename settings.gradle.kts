@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ReceiptVault"
 include(":app")
+include(":smoketest")
