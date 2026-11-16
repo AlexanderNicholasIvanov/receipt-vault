@@ -47,6 +47,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -88,12 +89,21 @@ import java.time.format.FormatStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewScreen(onBack: () -> Unit, onSaved: (Long) -> Unit, onUnsavedWork: (Boolean) -> Unit = {}) {
+fun ReviewScreen(
+    onBack: () -> Unit,
+    onSaved: (Long) -> Unit,
+    onUnsavedWork: (Boolean) -> Unit = {},
+    onNext: (CaptureSource) -> Unit = {},
+) {
     val vm = appViewModel { app, handle -> ReviewViewModel(app, handle) }
     val state by vm.state.collectAsStateWithLifecycle()
     val saved by vm.saved.collectAsStateWithLifecycle()
 
-    LaunchedEffect(saved) { saved?.let(onSaved) }
+    LaunchedEffect(saved) {
+        val id = saved ?: return@LaunchedEffect
+        val next = vm.next
+        if (vm.thenNext && next != null) onNext(next) else onSaved(id)
+    }
 
     val editing = state as? ReviewState.Editing
     val unsaved = editing?.hasUnsavedWork == true
@@ -378,8 +388,21 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
             }
         }
         item {
-            Button(onClick = vm::save, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp)) {
-                Text("Save receipt")
+            Column(Modifier.padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { vm.save(thenNext = false) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Save receipt")
+                }
+                vm.next?.let { next ->
+                    OutlinedButton(onClick = { vm.save(thenNext = true) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            when (next) {
+                                CaptureSource.SCAN -> "Save and scan the next one"
+                                CaptureSource.CAMERA -> "Save and photograph the next one"
+                                else -> "Save and add another"
+                            },
+                        )
+                    }
+                }
             }
         }
     }
