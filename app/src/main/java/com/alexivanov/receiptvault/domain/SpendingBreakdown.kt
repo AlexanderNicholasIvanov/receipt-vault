@@ -82,15 +82,7 @@ object SpendingBreakdown {
         val total = totals.sum()
         val line = costs.byCategory.firstOrNull { it.category == category }
 
-        // Item prices follow their receipt into the base currency.
-        val originalCurrency = receipts.associate { it.id to it.currency }
-        val byId = chosen.associateBy { it.id }
-        val chosenItems = items.mapNotNull { item ->
-            val receipt = byId[item.receiptId] ?: return@mapNotNull null
-            val from = originalCurrency.getValue(item.receiptId)
-            val price = if (from == receipt.currency) item.priceCents else rates?.toBase(item.priceCents, from) ?: return@mapNotNull null
-            Triple(item, price, receipt)
-        }
+        val chosenItems = priced(chosen, receipts, items, rates)
 
         return CategoryBreakdown(
             category = category,
@@ -120,6 +112,22 @@ object SpendingBreakdown {
         )
     }
 
+    /**
+     * The line items of [chosen] (receipts already converted to one currency), each with its price
+     * in that currency and its receipt. Items of other receipts are left out.
+     */
+    internal fun priced(chosen: List<Receipt>, original: List<Receipt>, items: List<LineItem>, rates: ExchangeRates?): List<Triple<LineItem, Long, Receipt>> {
+        // Item prices follow their receipt into the base currency.
+        val originalCurrency = original.associate { it.id to it.currency }
+        val byId = chosen.associateBy { it.id }
+        return items.mapNotNull { item ->
+            val receipt = byId[item.receiptId] ?: return@mapNotNull null
+            val from = originalCurrency.getValue(item.receiptId)
+            val price = if (from == receipt.currency) item.priceCents else rates?.toBase(item.priceCents, from) ?: return@mapNotNull null
+            Triple(item, price, receipt)
+        }
+    }
+
     /** Most often bought first, then by money spent. */
     private fun itemStats(items: List<Triple<LineItem, Long, Receipt>>, zone: ZoneId): List<ItemStat> =
         items.groupBy { (item, _, _) -> itemKey(item.name) }
@@ -144,7 +152,7 @@ object SpendingBreakdown {
             .sortedWith(compareByDescending<ItemStat> { it.timesBought }.thenByDescending { it.totalCents }.thenBy { it.name })
 
     /** A line's price is for all its units. */
-    private fun unitPrice(lineCents: Long, quantity: Int): Long {
+    internal fun unitPrice(lineCents: Long, quantity: Int): Long {
         val q = quantity.coerceAtLeast(1).toLong()
         return Math.floorDiv(lineCents + q / 2, q)
     }
