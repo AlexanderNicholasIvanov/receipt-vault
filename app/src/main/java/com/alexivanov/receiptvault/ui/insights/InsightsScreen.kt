@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,9 +57,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.Category
-import com.alexivanov.receiptvault.domain.Conversion
 import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Insights
+import com.alexivanov.receiptvault.domain.InsightsOverview
 import com.alexivanov.receiptvault.domain.MonthlyCosts
 import com.alexivanov.receiptvault.domain.Period
 import com.alexivanov.receiptvault.domain.Retirement
@@ -68,6 +70,8 @@ import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.roughMoney
 import com.alexivanov.receiptvault.ui.review.SectionTitle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
@@ -77,17 +81,19 @@ import java.time.format.TextStyle
 fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onRetirement: () -> Unit = {}) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
-    val all by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = emptyList())
+    val all by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = null)
     val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     var period by remember { mutableStateOf(Period.THIS_YEAR) }
 
     val today = LocalDate.now()
     val rates = settings.activeRates
-    val summary = remember(all, period, settings.defaultCurrency, rates) {
-        Insights.summarize(Insights.inPeriod(all, period, today), settings.defaultCurrency, rates)
+    // Several milliseconds with thousands of receipts: off the main thread, so scrolling never waits.
+    val overview by produceState<InsightsOverview?>(null, all, period, settings.defaultCurrency, rates) {
+        val receipts = all ?: return@produceState
+        value = withContext(Dispatchers.Default) {
+            Insights.overview(receipts, period, settings.defaultCurrency, LocalDate.now(), rates)
+        }
     }
-    val monthly = remember(all, summary.currency, rates) { Insights.monthly(Conversion.toBase(all, rates), summary.currency, today) }
-    val costs = remember(all, settings.defaultCurrency, rates) { CostEstimate.monthly(all, settings.defaultCurrency, today, rates) }
 
     Scaffold(
         topBar = {
@@ -99,6 +105,12 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
             )
         },
     ) { padding ->
+        val data = overview
+        if (data == null) {
+            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            return@Scaffold
+        }
+        val (summary, monthly, costs) = data
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -107,7 +119,7 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
             item { MonthlyCostCard(costs, onCategory) }
             if (costs.receipts > 0) {
                 item {
-                    val estimate = remember(costs, settings.retirement) { Retirement.estimate(settings.retirement, costs.byCategory, today.year) }
+                    val estimate = remember(costs, settings.retirement, today.year) { Retirement.estimate(settings.retirement, costs.byCategory, today.year) }
                     RetirementCard(estimate, settings.retirement, costs.currency, onRetirement)
                 }
             }

@@ -41,7 +41,35 @@ data class Summary(
     val ratesDate: LocalDate? = null,
 )
 
+/** Everything the Insights screen shows, worked out in one go off the main thread. */
+data class InsightsOverview(
+    val summary: Summary,
+    /** The last 6 months' totals in [Summary.currency]. */
+    val monthly: List<Pair<YearMonth, Long>>,
+    val costs: MonthlyCosts,
+)
+
 object Insights {
+
+    /**
+     * The Insights screen's numbers. With thousands of receipts this takes several milliseconds
+     * (the recurring-cost search is most of it), so callers run it on a background thread.
+     */
+    fun overview(
+        receipts: List<Receipt>,
+        period: Period,
+        fallbackCurrency: String,
+        today: LocalDate,
+        rates: ExchangeRates? = null,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): InsightsOverview {
+        val summary = summarize(inPeriod(receipts, period, today, zone), fallbackCurrency, rates)
+        return InsightsOverview(
+            summary = summary,
+            monthly = monthly(Conversion.toBase(receipts, rates), summary.currency, today, zone = zone),
+            costs = CostEstimate.monthly(receipts, fallbackCurrency, today, rates, zone),
+        )
+    }
 
     fun localDate(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): LocalDate =
         Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
