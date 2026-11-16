@@ -26,6 +26,7 @@ import com.alexivanov.receiptvault.ui.detail.DetailScreen
 import com.alexivanov.receiptvault.ui.home.HomeScreen
 import com.alexivanov.receiptvault.ui.insights.CategoryScreen
 import com.alexivanov.receiptvault.ui.insights.InsightsScreen
+import com.alexivanov.receiptvault.ui.insights.ItemHistoryScreen
 import com.alexivanov.receiptvault.ui.insights.RetirementScreen
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.review.CaptureSource
@@ -44,6 +45,7 @@ private object Routes {
     const val INSIGHTS = "insights"
     const val CATEGORY = "insights/category/{name}"
     const val RETIREMENT = "insights/retirement"
+    const val ITEM = "insights/item/{key}"
     const val SETTINGS = "settings"
     const val TRASH = "trash"
     const val BUDGETS = "budgets"
@@ -56,6 +58,9 @@ private object Routes {
     /** A category's breakdown; null for everything. */
     fun category(category: Category?) = "insights/category/${category?.name ?: ALL}"
     const val ALL = "ALL"
+
+    /** One item's prices over time, by its [com.alexivanov.receiptvault.domain.SpendingBreakdown.itemKey]. */
+    fun item(key: String) = "insights/item/${Uri.encode(key)}"
 }
 
 /**
@@ -147,7 +152,11 @@ fun AppNav(
             CategoryScreen(
                 category = Category.entries.firstOrNull { it.name == name },
                 onBack = { entry.ifResumed { nav.popBackStack() } },
+                onItem = { entry.ifResumed { nav.navigate(Routes.item(it)) } },
             )
+        }
+        composable(Routes.ITEM, arguments = listOf(navArgument("key") { type = NavType.StringType })) { entry ->
+            ItemHistoryScreen(itemKey = entry.arguments?.getString("key").orEmpty(), onBack = { entry.ifResumed { nav.popBackStack() } })
         }
         composable(Routes.SETTINGS) { entry ->
             SettingsScreen(onBack = { entry.ifResumed { nav.popBackStack() } }, onTrash = { entry.ifResumed { nav.navigate(Routes.TRASH) } }, onBudgets = { entry.ifResumed { nav.navigate(Routes.BUDGETS) } })

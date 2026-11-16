@@ -307,7 +307,10 @@ class AppSmokeTest {
         compose.onNodeWithText("Every month · usually $15.99", substring = true).assertExists()
 
         compose.onNodeWithText("Future").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("At this pace"), 5_000)
+        // No line items, so no rate yet: the card says what it needs.
+        compose.waitUntilAtLeastOneExists(hasText("Your inflation"), 5_000)
+        compose.onNodeWithText("Keep line items on your receipts", substring = true).assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("At this pace"))
     }
 
     @Test
@@ -338,6 +341,14 @@ class AppSmokeTest {
         compose.onNodeWithText("Milk 1 gal").assertExists()
         compose.onNodeWithText("Bought 2 times · $3.49–$3.79", substring = true).assertExists()
         compose.onNodeWithText("2 visits · usually", substring = true).assertExists()
+
+        // An item opens its price over time.
+        compose.onNodeWithText("Milk 1 gal").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Every purchase"), 5_000)
+        compose.onNodeWithText("Last paid").assertExists()
+        compose.onNodeWithText("Bought 2 times · cheapest $3.49 at Kroger").assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("What you usually buy here"), 5_000)
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
         compose.waitUntilAtLeastOneExists(hasText("You spend about"), 5_000)

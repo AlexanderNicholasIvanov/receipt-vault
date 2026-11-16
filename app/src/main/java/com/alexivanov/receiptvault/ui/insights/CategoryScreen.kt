@@ -1,5 +1,6 @@
 package com.alexivanov.receiptvault.ui.insights
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,7 +56,7 @@ private const val SHORT_LIST = 15
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoryScreen(category: Category?, onBack: () -> Unit) {
+fun CategoryScreen(category: Category?, onBack: () -> Unit, onItem: (String) -> Unit = {}) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val receipts by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = null)
@@ -120,7 +121,7 @@ fun CategoryScreen(category: Category?, onBack: () -> Unit) {
                             }
                             val shown = if (allItems) b.items else b.items.take(SHORT_LIST)
                             shown.forEach { item ->
-                                Column {
+                                Column(Modifier.clickable(onClickLabel = "See its price over time") { onItem(SpendingBreakdown.itemKey(item.name)) }) {
                                     Row(verticalAlignment = Alignment.Top) {
                                         Text(item.name, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                                         Text("usually ${money(item.typicalUnitCents, b.currency)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
