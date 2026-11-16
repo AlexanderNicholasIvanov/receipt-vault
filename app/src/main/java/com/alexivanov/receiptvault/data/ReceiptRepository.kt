@@ -25,6 +25,9 @@ class ReceiptRepository(
     suspend fun getAll(): List<Receipt> = dao.getAll()
     suspend fun getAllItems(): List<LineItem> = dao.getAllItems()
 
+    /** Line items of every receipt outside the trash, for spending breakdowns. */
+    val allItems: Flow<List<LineItem>> = dao.observeAllItems()
+
     suspend fun save(receipt: Receipt, items: List<LineItem>): Long = dao.save(receipt, items)
 
     val trash: Flow<List<Receipt>> = dao.observeTrash()

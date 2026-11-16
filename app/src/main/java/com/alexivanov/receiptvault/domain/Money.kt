@@ -76,6 +76,15 @@ object Money {
         return nf.format(BigDecimal.valueOf(cents).movePointLeft(2))
     }
 
+    /** Rounded to whole units, for estimates where cents would only suggest false precision. */
+    fun formatWhole(cents: Long, currencyCode: String, locale: Locale = Locale.getDefault()): String {
+        val nf = NumberFormat.getCurrencyInstance(locale)
+        runCatching { nf.currency = Currency.getInstance(currencyCode) }
+        nf.maximumFractionDigits = 0
+        nf.roundingMode = java.math.RoundingMode.HALF_UP
+        return nf.format(BigDecimal.valueOf(cents).movePointLeft(2))
+    }
+
     fun defaultCurrency(locale: Locale = Locale.getDefault()): String =
         runCatching { Currency.getInstance(locale).currencyCode }.getOrNull() ?: "USD"
 }
