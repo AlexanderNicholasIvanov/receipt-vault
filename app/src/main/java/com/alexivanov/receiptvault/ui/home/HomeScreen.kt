@@ -7,6 +7,8 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -59,6 +61,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -338,8 +341,9 @@ fun HomeScreen(
     }
 
     if (showSheet && !LocalAppLocked.current) {
-        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
-            Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+        // Fully open, and scrollable: half open on a small phone, the last options are out of sight.
+        ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 16.dp)) {
                 Text("Add a receipt", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 SheetOption(painterResource(R.drawable.ic_camera), "Scan receipt", "Auto-crops and flattens the paper. Long receipts can be scanned in several pages.") {
                     showSheet = false; capture.scan()
