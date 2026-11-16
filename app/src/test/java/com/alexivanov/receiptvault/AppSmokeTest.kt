@@ -12,6 +12,8 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
@@ -398,7 +400,13 @@ class AppSmokeTest {
             // A US healthcare figure, in one tap.
             list.performScrollToNode(hasText("Use about", substring = true))
             compose.onNodeWithText("Use about", substring = true).performScrollTo().performClick()
-            compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
+            try {
+                compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
+            } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+                println("Plan: " + runBlocking { app.settings.current().retirement })
+                println(compose.onRoot(useUnmergedTree = true).printToString())
+                throw e
+            }
 
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
             compose.waitUntilAtLeastOneExists(hasText("by age 67", substring = true), 5_000)
