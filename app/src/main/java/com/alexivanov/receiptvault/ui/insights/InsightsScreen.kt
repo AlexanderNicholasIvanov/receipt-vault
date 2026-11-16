@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -103,11 +104,7 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
                         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                     },
                 )
-                PrimaryTabRow(selectedTabIndex = tab) {
-                    listOf("Spending", "Bills", "Future").forEachIndexed { i, title ->
-                        Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
-                    }
-                }
+                InsightsTabs(tab, onTab = { tab = it })
             }
         },
     ) { padding ->
@@ -136,6 +133,24 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
                 modifier = content,
             )
         }
+    }
+}
+
+/**
+ * Spending · Bills · Future. At large text sizes the three no longer fit across a phone, so the
+ * row scrolls instead of breaking a word over two lines.
+ */
+@Composable
+private fun InsightsTabs(selected: Int, onTab: (Int) -> Unit) {
+    val tabs = @Composable {
+        listOf("Spending", "Bills", "Future").forEachIndexed { i, title ->
+            Tab(selected = selected == i, onClick = { onTab(i) }, text = { Text(title) })
+        }
+    }
+    if (isLargeFont()) {
+        PrimaryScrollableTabRow(selectedTabIndex = selected, edgePadding = 0.dp, tabs = tabs)
+    } else {
+        PrimaryTabRow(selectedTabIndex = selected, tabs = tabs)
     }
 }
 

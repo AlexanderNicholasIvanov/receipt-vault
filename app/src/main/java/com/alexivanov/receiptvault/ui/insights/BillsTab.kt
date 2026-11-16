@@ -35,6 +35,7 @@ import com.alexivanov.receiptvault.domain.Bills
 import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.DueBill
 import com.alexivanov.receiptvault.domain.MonthlyCosts
+import com.alexivanov.receiptvault.domain.RecurringCost
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -116,6 +117,7 @@ private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) 
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        PriceChangeTag(d.bill, currency)
                     }
                     Text("usually ${money(d.bill.typicalCents, currency)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -152,6 +154,24 @@ private fun WeekStrip(due: List<DueBill>, currency: String, today: LocalDate, lo
     }
 }
 
+/** "▲ Price up from $15.99 on Sep 19, 2026" while a bill's new price is still news. */
+internal fun priceChangeText(bill: RecurringCost, currency: String): String? {
+    val change = bill.priceChange?.takeIf { it.recent } ?: return null
+    val what = if (change.up) "▲ Price up" else "▼ Price down"
+    return "$what from ${money(change.fromCents, currency)} on ${formatDate(change.since)}"
+}
+
+/** An arrow and words, so the change never depends on color alone. */
+@Composable
+private fun PriceChangeTag(bill: RecurringCost, currency: String) {
+    val text = priceChangeText(bill, currency) ?: return
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (bill.priceChange?.up == true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+    )
+}
+
 /** Merchants paid at a steady pace, with their usual amount and when the next one is due. */
 @Composable
 private fun RecurringCosts(c: MonthlyCosts) {
@@ -179,14 +199,7 @@ private fun RecurringCosts(c: MonthlyCosts) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (r.priceUp) {
-                        // An arrow and words, so the change never depends on color alone.
-                        Text(
-                            "▲ Price up: ${money(r.previousCents ?: r.typicalCents, c.currency)} → ${money(r.latestCents, c.currency)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
+                    PriceChangeTag(r, c.currency)
                 }
             }
         }

@@ -15,12 +15,35 @@ data class CategoryCost(
     val timesPerMonth: Double,
 )
 
+/**
+ * A bill on a calendar cycle that now charges a different amount: [fromCents] before, [toCents]
+ * from [since] on, for [paymentsSince] payments so far.
+ */
+data class PriceChange(
+    val fromCents: Long,
+    val toCents: Long,
+    val since: LocalDate,
+    val paymentsSince: Int,
+) {
+    val up: Boolean get() = toCents > fromCents
+
+    /** News while the new price is on its first few bills; after that it's just the price. */
+    val recent: Boolean get() = paymentsSince <= RECENT_PAYMENTS
+
+    companion object {
+        const val RECENT_PAYMENTS = 3
+    }
+}
+
 /** A merchant paid at a steady pace: a subscription, a monthly bill, the weekly shop. */
 data class RecurringCost(
     val merchant: String,
     val category: Category,
     val receipts: Int,
-    /** The usual amount of one payment (the median). */
+    /**
+     * The usual amount of one payment: the median, or for a bill whose price changed, the
+     * median since the change.
+     */
     val typicalCents: Long,
     /** The usual number of days between payments (the median). */
     val everyDays: Int,
@@ -31,6 +54,8 @@ data class RecurringCost(
     val latestCents: Long = typicalCents,
     /** The payment before it. */
     val previousCents: Long? = null,
+    /** The last change of price, for bills on a calendar cycle; null when the price has held. */
+    val priceChange: PriceChange? = null,
 ) {
     /**
      * The latest payment of a bill on a calendar cycle (a subscription, a monthly bill) is at
@@ -39,7 +64,7 @@ data class RecurringCost(
      */
     val priceUp: Boolean
         get() = previousCents != null && CostEstimate.isCalendarCycle(everyDays) &&
-            latestCents - previousCents >= maxOf(100L, Math.floorDiv(previousCents + 19, 20))
+            CostEstimate.isPriceStep(previousCents, latestCents) && latestCents > previousCents
 }
 
 data class MonthlyCosts(
@@ -136,7 +161,8 @@ object CostEstimate {
                 val stopped = ChronoUnit.DAYS.between(last, today) > every * 2 + 7
                 if (!steady || stopped) return@mapNotNull null
                 val payments = byDay.values.map { day -> day.sumOf { it.totalCents } }
-                val typical = median(payments)
+                val change = if (isCalendarCycle(every.toInt())) priceChange(payments, byDay.keys.toList()) else null
+                val typical = change?.toCents ?: median(payments)
                 val latest = list.maxBy { it.purchasedAt }
                 RecurringCost(
                     merchant = latest.merchant.trim(),
@@ -149,9 +175,35 @@ object CostEstimate {
                     nextDate = dueDate(last, every.toInt(), 1),
                     latestCents = payments.last(),
                     previousCents = payments[payments.size - 2],
+                    priceChange = change,
                 )
             }
             .sortedByDescending { it.monthlyCents }
+
+    /**
+     * At least 5 % and one currency unit apart: a new price, not rounding or a small fee.
+     */
+    fun isPriceStep(a: Long, b: Long): Boolean {
+        val lower = minOf(a, b)
+        return maxOf(a, b) - lower >= maxOf(100L, Math.floorDiv(lower + 19, 20))
+    }
+
+    /**
+     * The latest change of price in [payments] (oldest first, paid on [dates]): the last step
+     * between two payments, after a price that held for at least two payments. A bill that varies
+     * every month (electricity) has no price to change, and a one-off charge followed by the usual
+     * one is not a change.
+     */
+    internal fun priceChange(payments: List<Long>, dates: List<LocalDate>): PriceChange? {
+        fun stepAt(i: Int) = isPriceStep(payments[i - 1], payments[i])
+        val at = (payments.size - 1 downTo 1).firstOrNull(::stepAt) ?: return null
+        val held = (at - 1 downTo 1).firstOrNull(::stepAt) ?: 0
+        if (at - held < 2) return null
+        val before = median(payments.subList(held, at))
+        val after = median(payments.subList(at, payments.size))
+        if (!isPriceStep(before, after)) return null
+        return PriceChange(fromCents = before, toCents = after, since = dates[at], paymentsSince = payments.size - at)
+    }
 
     /**
      * A payment of [cents] every [days] days, as a monthly amount. Bills on a calendar cycle count
