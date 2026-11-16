@@ -399,6 +399,9 @@ class AppSmokeTest {
             // A US healthcare figure, in one tap.
             list.performScrollToNode(hasText("Use about", substring = true))
             compose.onNodeWithText("Use about", substring = true).performScrollTo().performClick()
+            // Let the screen recompose and start saving before polling what was saved: polling alone
+            // doesn't always run the main looper, and on CI the save then never started.
+            compose.waitForIdle()
             compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
 
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
