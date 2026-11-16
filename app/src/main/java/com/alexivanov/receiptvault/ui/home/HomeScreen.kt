@@ -25,9 +25,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.alexivanov.receiptvault.domain.Problems
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.shareFile
@@ -115,6 +118,8 @@ fun HomeScreen(
     onCategory: (Category) -> Unit = {},
     /** Start the scanner or camera without a tap on Home: a Scan shortcut, or the next receipt of a pile. */
     captureRequests: Flow<CaptureSource> = emptyFlow(),
+    /** On a wide screen, the receipt open beside the list; its row is marked. */
+    openReceiptId: Long? = null,
     modifier: Modifier = Modifier,
 ) {
     val vm = appViewModel { app, _ -> HomeViewModel(app) }
@@ -328,6 +333,7 @@ fun HomeScreen(
                     ReceiptRow(
                         r,
                         selected = r.id in selected,
+                        open = r.id == openReceiptId,
                         onClick = { if (selecting) vm.toggleSelected(r.id) else onOpen(r.id) },
                         onLongClick = { vm.toggleSelected(r.id) },
                     )
@@ -476,16 +482,29 @@ private fun Stat(label: String, value: String) {
 }
 
 @Composable
-private fun ReceiptRow(r: Receipt, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun ReceiptRow(r: Receipt, selected: Boolean, open: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val category = Category.fromName(r.category)
+    // The open receipt gets a tinted row and a bar on its leading edge, so it reads apart from
+    // receipts picked for a bulk action, and TalkBack says so too.
+    val indicator = MaterialTheme.colorScheme.primary
     ListItem(
         modifier = Modifier
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "Select")
-            .semantics { this.selected = selected },
-        colors = if (selected) {
-            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        } else {
-            ListItemDefaults.colors()
+            .semantics {
+                this.selected = selected
+                if (open) stateDescription = "Open beside the list"
+            }
+            .then(
+                if (open && !selected) {
+                    Modifier.drawBehind { drawRect(indicator, size = Size(4.dp.toPx(), size.height)) }
+                } else {
+                    Modifier
+                },
+            ),
+        colors = when {
+            selected -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            open -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+            else -> ListItemDefaults.colors()
         },
         leadingContent = {
             Box(
