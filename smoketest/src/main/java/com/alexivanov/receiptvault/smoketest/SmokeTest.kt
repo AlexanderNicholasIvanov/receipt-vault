@@ -52,6 +52,8 @@ class SmokeTest {
 
     @Before
     fun launch() {
+        // R8 problems are what this looks for: the profile-recording build has no R8.
+        org.junit.Assume.assumeFalse(BuildConfig.RECORDS_PROFILE)
         device.executeShellCommand("logcat -c -b crash")
         device.pressHome()
         val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE)!!
@@ -175,7 +177,7 @@ class SmokeTest {
     private fun screenText(): String =
         device.findObjects(By.textContains("")).mapNotNull { it.text }.filter { it.isNotBlank() }.joinToString(" | ")
 
-    private companion object {
+    companion object {
         const val PACKAGE = "com.alexivanov.receiptvault"
         const val TIMEOUT = 15_000L
     }
