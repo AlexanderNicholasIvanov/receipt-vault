@@ -22,6 +22,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -35,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -42,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.CategoryCost
 import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.Retirement
@@ -76,6 +80,9 @@ fun RetirementScreen(onBack: () -> Unit) {
     var income by rememberSaveable { mutableStateOf("") }
     var inflation by rememberSaveable { mutableStateOf("") }
     var growth by rememberSaveable { mutableStateOf("") }
+    var retiredGrowth by rememberSaveable { mutableStateOf("") }
+    var health by rememberSaveable { mutableStateOf("") }
+    var falls by rememberSaveable { mutableStateOf(false) }
     var excluded by rememberSaveable { mutableStateOf(listOf<String>()) }
     var loaded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(loadedSettings) {
@@ -89,6 +96,9 @@ fun RetirementScreen(onBack: () -> Unit) {
         income = if (p.incomeMonthlyCents > 0) Money.toPlain(p.incomeMonthlyCents) else ""
         inflation = Retirement.percentText(p.inflationBp)
         growth = Retirement.percentText(p.returnBp)
+        retiredGrowth = p.retiredReturnBp?.let(Retirement::percentText).orEmpty()
+        health = if (p.healthcareMonthlyCents > 0) Money.toPlain(p.healthcareMonthlyCents) else ""
+        falls = p.spendingFalls
         excluded = p.excluded.map { it.name }
         loaded = true
     }
@@ -101,6 +111,10 @@ fun RetirementScreen(onBack: () -> Unit) {
         planToAge = planTo.trim().toIntOrNull()?.takeIf { it in 31..120 } ?: saved0.planToAge,
         inflationBp = Retirement.parsePercent(inflation) ?: saved0.inflationBp,
         returnBp = Retirement.parsePercent(growth) ?: saved0.returnBp,
+        // Empty is "the same as before retiring".
+        retiredReturnBp = if (retiredGrowth.isBlank()) null else Retirement.parsePercent(retiredGrowth) ?: saved0.retiredReturnBp,
+        spendingFalls = falls,
+        healthcareMonthlyCents = Money.parseUserInput(health)?.coerceAtLeast(0) ?: 0,
         savedCents = Money.parseUserInput(saved)?.coerceAtLeast(0) ?: 0,
         otherMonthlyCents = Money.parseUserInput(other)?.coerceAtLeast(0) ?: 0,
         incomeMonthlyCents = Money.parseUserInput(income)?.coerceAtLeast(0) ?: 0,
@@ -114,6 +128,7 @@ fun RetirementScreen(onBack: () -> Unit) {
         CostEstimate.monthly(all, settings.defaultCurrency, today, settings.activeRates)
     }
     val estimate = remember(plan, costs) { Retirement.estimate(plan, costs.byCategory, today.year) }
+    val range = remember(plan, costs) { Retirement.range(plan, costs.byCategory, today.year) }
     val currency = costs.currency
 
     Scaffold(
@@ -132,6 +147,10 @@ fun RetirementScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { Result(estimate, plan, currency) }
+            item { RangeCard(range.first, estimate, range.second, currency) }
+            if (estimate.age != null) {
+                item { WhatIfCard(plan, estimate, costs.byCategory, today.year, currency) { retireAge = it.toString() } }
+            }
 
             item { SectionTitle("Spending in retirement") }
             item {
@@ -173,6 +192,33 @@ fun RetirementScreen(onBack: () -> Unit) {
                         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Field("Other costs a month ($currency)", other, KeyboardType.Decimal, "Rent, utilities, internet, insurance") { other = it }
                             Field("Pension or Social Security a month ($currency)", income, KeyboardType.Decimal, "Leave empty if none") { income = it }
+                            Field("Healthcare a month ($currency)", health, KeyboardType.Decimal, "Premiums and out-of-pocket costs") { health = it }
+                            if (currency == "USD" && health.isBlank()) {
+                                val suggested = Retirement.usHealthcareMonthly(estimate.yearsInRetirement)
+                                Text(
+                                    "Fidelity estimates one person retiring at 65 in the US spends about " +
+                                        "${roughMoney(Retirement.US_HEALTHCARE_CENTS, currency)} on healthcare over retirement.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                TextButton(onClick = { health = Money.toPlain(suggested) }) {
+                                    Text("Use about ${money(suggested, currency)} a month")
+                                }
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().clickable(role = Role.Switch) { falls = !falls },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                                    Text("Spend a little less each year")
+                                    Text(
+                                        "Studies of retirees find spending usually falls about 1% a year after inflation. Off, it stays flat.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Switch(checked = falls, onCheckedChange = null)
+                            }
                             Text(
                                 "Retirement has to pay ${money(estimate.monthlyTodayCents, currency)} a month in today's money " +
                                     "(${money(estimate.receiptsMonthlyCents, currency)} from receipts).",
@@ -200,14 +246,15 @@ fun RetirementScreen(onBack: () -> Unit) {
             item { SectionTitle("Assumptions") }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Field("Inflation %", inflation, KeyboardType.Decimal) { inflation = it }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Field("Inflation %", inflation, KeyboardType.Decimal, modifier = Modifier.weight(1f)) { inflation = it }
-                        Field("Investment return %", growth, KeyboardType.Decimal, modifier = Modifier.weight(1f)) { growth = it }
+                        Field("Return until retiring %", growth, KeyboardType.Decimal, modifier = Modifier.weight(1f)) { growth = it }
+                        Field("Return once retired %", retiredGrowth, KeyboardType.Decimal, "Same", modifier = Modifier.weight(1f)) { retiredGrowth = it }
                     }
                     Text(
-                        "Both are yearly rates. A rough estimate, not financial advice. It assumes you keep spending what your receipts show, " +
-                            "rising with inflation, and that savings earn the same return before and during retirement. " +
-                            "Taxes are not included.",
+                        "All are yearly rates. Many people move savings to safer, lower-return investments once retired. " +
+                            "A rough estimate, not financial advice. It assumes you keep spending what your receipts show, " +
+                            "rising with inflation. Taxes are not included.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -272,6 +319,73 @@ private fun Result(e: RetirementEstimate, plan: RetirementPlan, currency: String
                 color = muted,
                 modifier = Modifier.padding(top = 8.dp),
             )
+        }
+    }
+}
+
+/** The estimate if returns once retired are a point better or worse: how sure the answer is. */
+@Composable
+private fun RangeCard(tight: RetirementEstimate, likely: RetirementEstimate, comfortable: RetirementEstimate, currency: String) {
+    // Before the age is known, only today's money is.
+    fun amount(e: RetirementEstimate) = roughMoney(if (likely.age == null) e.neededTodayCents else e.neededCents, currency)
+    val point = Retirement.RANGE_BP / 100
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("A range, not one number", style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth()) {
+                listOf("Tight" to tight, "Likely" to likely, "Comfortable" to comfortable).forEach { (label, e) ->
+                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(amount(e), fontWeight = if (e === likely) FontWeight.SemiBold else FontWeight.Normal)
+                    }
+                }
+            }
+            Text(
+                "Tight if returns once retired are $point point higher than you set, comfortable if they are " +
+                    "$point point lower. Returns vary, so aim for the comfortable end if you can.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The same plan, retiring a few years earlier or later. Tapping one uses that age. */
+@Composable
+private fun WhatIfCard(
+    plan: RetirementPlan,
+    current: RetirementEstimate,
+    byCategory: List<CategoryCost>,
+    year: Int,
+    currency: String,
+    onPick: (Int) -> Unit,
+) {
+    val age = current.age ?: return
+    val ages = listOf(-5, -2, 2, 5).map { plan.retireAge + it }.filter { it > age && it < plan.planToAge && it in 30..100 }
+    if (ages.isEmpty()) return
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(vertical = 8.dp)) {
+            Text(
+                "What if you retire at another age?",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            ages.forEach { a ->
+                val e = remember(plan, byCategory, a) { Retirement.estimate(plan.copy(retireAge = a), byCategory, year) }
+                val save = if (e.shortfallCents == 0L) "Nothing more to save" else "Save ${roughMoney(e.monthlySavingCents, currency)} a month"
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clickable(onClickLabel = "Use this age") { onPick(a) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("At $a", Modifier.padding(end = 16.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Column(Modifier.weight(1f)) {
+                        Text("About ${roughMoney(e.neededCents, currency)}")
+                        Text(save, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
     }
 }

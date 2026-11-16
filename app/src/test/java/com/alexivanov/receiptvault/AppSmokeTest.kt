@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -385,8 +386,25 @@ class AppSmokeTest {
             compose.onNodeWithText("when you retire at 65, in 25 years", substring = true).assertExists()
             compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.birthYear } == LocalDate.now().year - 40 }
 
+            // The range, and retiring at another age.
+            val list = compose.onAllNodes(hasScrollAction()).onFirst()
+            list.performScrollToNode(hasText("A range, not one number"))
+            compose.onNodeWithText("Comfortable").assertExists()
+            list.performScrollToNode(hasText("At 67"))
+            compose.onNodeWithText("At 67").performScrollTo().performClick()
+            list.performScrollToIndex(0)
+            compose.waitUntilAtLeastOneExists(hasText("when you retire at 67, in 27 years", substring = true), 5_000)
+
+            // A US healthcare figure, in one tap.
+            list.performScrollToNode(hasText("Use about", substring = true))
+            compose.onNodeWithText("Use about", substring = true).performScrollTo().performClick()
+            // Let the screen recompose and start saving before polling what was saved: polling alone
+            // doesn't always run the main looper, and on CI the save then never started.
+            compose.waitForIdle()
+            compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
+
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-            compose.waitUntilAtLeastOneExists(hasText("by age 65", substring = true), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("by age 67", substring = true), 5_000)
         } finally {
             runBlocking { app.settings.setRetirementPlan(com.alexivanov.receiptvault.domain.RetirementPlan()) }
         }

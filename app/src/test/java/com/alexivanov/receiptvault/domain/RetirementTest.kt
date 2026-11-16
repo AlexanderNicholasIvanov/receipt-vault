@@ -99,6 +99,11 @@ class RetirementTest {
             excluded = setOf(Category.FUEL, Category.TRAVEL),
         )
         assertEquals(plan, RetirementPlan.decode(plan.encode()))
+        val more = plan.copy(retiredReturnBp = 400, spendingFalls = true, healthcareMonthlyCents = 51_500)
+        assertEquals(more, RetirementPlan.decode(more.encode()))
+        // A plan saved before these existed has none of their keys, and loads with them off.
+        assertEquals(false, RetirementPlan.decode("retire=62;return=650").spendingFalls)
+        assertNull(RetirementPlan.decode("retire=62;return=650").retiredReturnBp)
         assertEquals(RetirementPlan(), RetirementPlan.decode(null))
         assertEquals(RetirementPlan(), RetirementPlan.decode("retire=oops;skip=NOPE"))
     }
@@ -113,5 +118,45 @@ class RetirementTest {
         assertNull(Retirement.parsePercent("abc"))
         assertEquals("3.5", Retirement.percentText(350))
         assertEquals("5", Retirement.percentText(500))
+    }
+
+    @Test
+    fun `a lower return once retired needs more, and the range brackets it`() {
+        val plan = RetirementPlan(birthYear = 1986, inflationBp = 300, returnBp = 600)
+        val same = Retirement.estimate(plan, spending, 2026)
+        val safer = Retirement.estimate(plan.copy(retiredReturnBp = 400), spending, 2026)
+        assertTrue(safer.neededCents > same.neededCents)
+        // Saving until then still grows at 6 %.
+        assertEquals(same.savingsAtRetirementCents, safer.savingsAtRetirementCents)
+
+        val (tight, comfortable) = Retirement.range(plan.copy(retiredReturnBp = 400), spending, 2026)
+        assertTrue(tight.neededCents < safer.neededCents && safer.neededCents < comfortable.neededCents)
+        // Tight is the same as a 5 % return, comfortable as 3 %.
+        assertEquals(Retirement.estimate(plan.copy(retiredReturnBp = 500), spending, 2026), tight)
+        assertEquals(Retirement.estimate(plan.copy(retiredReturnBp = 300), spending, 2026), comfortable)
+        // Never below a 0 % return.
+        assertEquals(
+            Retirement.estimate(plan.copy(retiredReturnBp = 0), spending, 2026),
+            Retirement.range(plan.copy(retiredReturnBp = 50), spending, 2026).second,
+        )
+    }
+
+    @Test
+    fun `spending that falls 1 percent a year needs what a sum of falling years needs`() {
+        // No inflation and no return: 30 years of $1,000 a month falling 1 % a year.
+        val plan = RetirementPlan(retireAge = 65, planToAge = 95, inflationBp = 0, returnBp = 0, spendingFalls = true)
+        val e = Retirement.estimate(plan, listOf(CategoryCost(Category.GROCERIES, 10, 100_000, 1.0)), 2026)
+        val years = (0 until 30).sumOf { 0.99.let { f -> Math.pow(f, it.toDouble()) } }
+        assertNear(Math.round(1_200_000 * years), e.neededTodayCents)
+        assertTrue(e.neededTodayCents < 1_200_000L * 30)
+    }
+
+    @Test
+    fun `healthcare is part of what retirement pays for`() {
+        val plan = RetirementPlan(healthcareMonthlyCents = 51_500)
+        val e = Retirement.estimate(plan, spending, 2026)
+        assertEquals(100_000L + 51_500, e.monthlyTodayCents)
+        // Fidelity's $185,500 over 30 years is about $515 a month.
+        assertEquals(51_528, Retirement.usHealthcareMonthly(30))
     }
 }
