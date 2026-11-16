@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -19,10 +20,14 @@ import androidx.test.uiautomator.Until
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.regex.Pattern
 
 /**
  * Clicks through the minified app like a user would. Most R8 mistakes (a class or member
@@ -35,6 +40,16 @@ class SmokeTest {
     private val device = UiDevice.getInstance(instrumentation)
     private val context = instrumentation.context
 
+    /** Whatever fails, the screen it failed on goes to logcat, which CI keeps per test. */
+    @get:Rule
+    val dumpOnFailure = object : TestWatcher() {
+        override fun failed(e: Throwable?, description: Description?) {
+            val xml = ByteArrayOutputStream()
+            runCatching { device.dumpWindowHierarchy(xml) }
+            xml.toString(Charsets.UTF_8.name()).chunked(3_000).forEach { Log.i("SmokeTest", it) }
+        }
+    }
+
     @Before
     fun launch() {
         device.executeShellCommand("logcat -c -b crash")
@@ -42,7 +57,7 @@ class SmokeTest {
         val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE)!!
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(intent)
-        waitFor(By.text("Receipts"))
+        waitFor(label("Receipts"))
     }
 
     @After
@@ -53,29 +68,29 @@ class SmokeTest {
 
     @Test
     fun addAReceiptByHandAndVisitEveryScreen() {
-        find(By.text("Add receipt")).click()
-        find(By.text("Enter manually")).click()
+        find(label("Add receipt")).click()
+        find(label("Enter manually")).click()
         type("Merchant", "Smoke Test Cafe")
         type("Total", "12.34")
-        find(By.text("Save")).click()
+        find(label("Save")).click()
         // A rerun on the same emulator saves the same receipt twice.
-        device.wait(Until.findObject(By.text("Save anyway")), 2_000)?.click()
+        device.wait(Until.findObject(label("Save anyway")), 2_000)?.click()
 
-        find(By.text("Smoke Test Cafe")).click()
-        waitFor(By.text("Receipt"))
+        find(label("Smoke Test Cafe")).click()
+        waitFor(label("Receipt"))
         device.pressBack()
 
         find(By.desc("Insights")).click()
-        waitFor(By.text("Insights"))
+        waitFor(label("Insights"))
         scrollToEnd()
         device.pressBack()
 
         find(By.desc("Settings")).click()
-        waitFor(By.text("Settings"))
+        waitFor(label("Settings"))
         scrollToEnd()
         device.pressBack()
 
-        waitFor(By.text("Receipts"))
+        waitFor(label("Receipts"))
     }
 
     @Test
@@ -90,7 +105,7 @@ class SmokeTest {
             context.startActivity(share)
             // Reading may succeed or explain that the model is still downloading; either way the
             // review screen opens. A crash fails the test in noCrashes().
-            waitFor(By.text("Save"), timeout = 90_000)
+            waitFor(label("Save"), timeout = 90_000)
             device.pressBack()
         } finally {
             context.contentResolver.delete(photo, null, null)
@@ -113,11 +128,19 @@ class SmokeTest {
         return uri
     }
 
-    /** Taps the text field labelled [label] and types into it. */
-    private fun type(label: String, text: String) {
-        find(By.text(label)).click()
+    /**
+     * A node whose text is [text], or starts with it followed by more merged text: a list item
+     * reports its headline and supporting line together ("Enter manually, No photo, ...").
+     */
+    private fun label(text: String): BySelector =
+        By.text(Pattern.compile(Pattern.quote(text) + """(\W.*)?""", Pattern.DOTALL))
+
+    /** Taps the text field labelled [name] and types into it. */
+    private fun type(name: String, text: String) {
+        // An empty field reports its label as the hint; some versions report it as the text.
+        (device.wait(Until.findObject(By.hint(name)), 3_000) ?: find(label(name))).click()
         val field = device.wait(Until.findObject(By.focused(true)), TIMEOUT)
-            ?: throw AssertionError("No field took focus after tapping \"$label\"")
+            ?: throw AssertionError("No field took focus after tapping \"$name\"")
         field.text = text
     }
 
@@ -138,9 +161,10 @@ class SmokeTest {
     /** Waits for [selector], scrolling down the screen's list if it is further down. */
     private fun find(selector: BySelector): UiObject2 {
         device.wait(Until.findObject(selector), TIMEOUT)?.let { return it }
-        val list = device.findObject(By.scrollable(true))
-        list?.scrollUntil(Direction.DOWN, Until.findObject(selector))?.let { return it }
-        return waitFor(selector)
+        // The list can be replaced while it scrolls (a sheet opening, a recomposition).
+        runCatching { device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(selector)) }
+            .getOrNull()?.let { return it }
+        return waitFor(selector, timeout = 2_000)
     }
 
     private fun scrollToEnd() {
