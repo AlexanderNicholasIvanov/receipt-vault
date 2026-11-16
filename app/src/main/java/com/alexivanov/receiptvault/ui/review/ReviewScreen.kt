@@ -200,7 +200,7 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
         item { SectionTitle("Store") }
         item {
             OutlinedTextField(
-                value = d.merchant, onValueChange = { v -> vm.edit { it.copy(merchant = v) } },
+                value = d.merchant, onValueChange = vm::setMerchant,
                 label = { Text("Merchant") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
             )
@@ -210,9 +210,22 @@ private fun EditForm(s: ReviewState.Editing, vm: ReviewViewModel) {
                 Category.entries.forEach { c ->
                     FilterChip(
                         selected = d.category == c,
-                        onClick = { vm.edit { it.copy(category = c) } },
+                        onClick = { vm.pickCategory(c) },
                         label = { Text("${c.emoji} ${c.label}") },
                     )
+                }
+            }
+        }
+        s.learned?.let { l ->
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${l.category.label}, as on your other receipts from ${l.merchant}.",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = vm::undoLearnedCategory) { Text("Undo") }
                 }
             }
         }

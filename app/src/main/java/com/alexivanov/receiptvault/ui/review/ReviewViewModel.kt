@@ -10,6 +10,8 @@ import com.alexivanov.receiptvault.AppContainer
 import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.CategoryMemory
+import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Duplicates
 import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
@@ -25,6 +27,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -94,11 +98,16 @@ sealed interface ReviewState {
         val duplicateOf: Receipt? = null,
         /** The form as it first opened; null for one resumed after Android closed the app. */
         val original: ReceiptDraft? = null,
+        /** The category was set from this store's earlier receipts; the screen says so, with Undo. */
+        val learned: LearnedCategory? = null,
     ) : ReviewState {
         /** Leaving now would lose something: typed changes, or a new photo that exists nowhere else. */
         val hasUnsavedWork: Boolean get() = draft != original || (isNew && imagePath != null)
     }
     data class Failed(val message: String) : ReviewState
+
+    /** [category] came from the user's earlier receipts from [merchant]; Undo goes back to [instead]. */
+    data class LearnedCategory(val category: Category, val merchant: String, val instead: Category)
 }
 
 class ReviewViewModel(
@@ -122,6 +131,15 @@ class ReviewViewModel(
     private var ocrText: String = ""
     private var imagePath: String? = null
     private var nextKey = 1L
+
+    /** Once the user picks a category themselves, it is never changed for them. */
+    private var categoryPicked = false
+
+    /** Each store's last category, from the saved receipts. */
+    private val memory: StateFlow<Map<String, Category>> = app.receipts.receipts
+        .map { CategoryMemory.learn(it) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     init {
         viewModelScope.launch {
@@ -254,11 +272,15 @@ class ReviewViewModel(
             joinPages(pages) { notice = notice ?: it }
         }
 
-        _state.value = ReviewState.Editing(
-            draft = parsed.toDraft(settings.defaultCurrency),
-            isNew = true,
-            imagePath = imagePath,
-            notice = notice,
+        val learned = withContext(Dispatchers.Default) { CategoryMemory.learn(app.receipts.receipts.first()) }
+        _state.value = withLearned(
+            ReviewState.Editing(
+                draft = parsed.toDraft(settings.defaultCurrency),
+                isNew = true,
+                imagePath = imagePath,
+                notice = notice,
+            ),
+            learned,
         )
         markOriginal()
     }
@@ -308,6 +330,43 @@ class ReviewViewModel(
 
     fun edit(transform: (ReceiptDraft) -> ReceiptDraft) {
         _state.update { s -> if (s is ReviewState.Editing) s.copy(draft = transform(s.draft), error = null) else s }
+    }
+
+    fun setMerchant(merchant: String) = _state.update { s ->
+        if (s is ReviewState.Editing) withLearned(s.copy(draft = s.draft.copy(merchant = merchant), error = null), memory.value) else s
+    }
+
+    fun pickCategory(category: Category) {
+        categoryPicked = true
+        _state.update { s -> if (s is ReviewState.Editing) s.copy(draft = s.draft.copy(category = category), learned = null) else s }
+    }
+
+    /** Back to the category the receipt had before this store's was used, and no more changes. */
+    fun undoLearnedCategory() {
+        categoryPicked = true
+        _state.update { s ->
+            val l = (s as? ReviewState.Editing)?.learned ?: return@update s
+            s.copy(draft = s.draft.copy(category = l.instead), learned = null)
+        }
+    }
+
+    /**
+     * A new receipt from a store the user has given a category before starts with that category.
+     * If the merchant is then changed to one with no history, the earlier category comes back.
+     */
+    private fun withLearned(s: ReviewState.Editing, memory: Map<String, Category>): ReviewState.Editing {
+        if (!s.isNew || categoryPicked) return s
+        val known = memory[CostEstimate.merchantKey(s.draft.merchant)]
+        val shown = s.learned
+        return when {
+            known != null && known != s.draft.category -> s.copy(
+                draft = s.draft.copy(category = known),
+                learned = ReviewState.LearnedCategory(known, s.draft.merchant.trim(), shown?.instead ?: s.draft.category),
+            )
+            known != null -> s
+            shown != null -> s.copy(draft = s.draft.copy(category = shown.instead), learned = null)
+            else -> s
+        }
     }
 
     fun addItem() = edit { it.copy(items = it.items + ItemDraft(nextKey++, "", "1", "")) }

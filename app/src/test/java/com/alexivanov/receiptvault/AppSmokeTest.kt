@@ -3,6 +3,7 @@ package com.alexivanov.receiptvault
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -405,6 +406,33 @@ class AppSmokeTest {
         } finally {
             runBlocking { app.settings.setRetirementPlan(com.alexivanov.receiptvault.domain.RetirementPlan()) }
         }
+    }
+
+    @Test
+    fun `a new receipt from a known store starts with its category, with undo`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        runBlocking {
+            val now = System.currentTimeMillis()
+            app.receipts.save(Receipt(merchant = "Joe's Diner", category = Category.DINING.name, totalCents = 2_000, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now), emptyList())
+        }
+        compose.waitUntilAtLeastOneExists(hasText("Joe's Diner"), 10_000)
+
+        compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+        compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+        val dining = "${Category.DINING.emoji} ${Category.DINING.label}"
+        val other = "${Category.OTHER.emoji} ${Category.OTHER.label}"
+        compose.onNodeWithText(other).assertIsSelected()
+
+        compose.onNodeWithText("Merchant").performTextInput("JOE'S DINER")
+        compose.waitUntilAtLeastOneExists(hasText("Dining, as on your other receipts from JOE'S DINER."), 5_000)
+        compose.onNodeWithText(dining).assertIsSelected()
+
+        compose.onNodeWithText("Undo").performClick()
+        compose.onNodeWithText(other).assertIsSelected()
+        compose.onNodeWithText("Dining, as on your", substring = true).assertDoesNotExist()
     }
 
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
