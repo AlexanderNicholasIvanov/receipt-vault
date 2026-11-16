@@ -385,7 +385,7 @@ class AppSmokeTest {
             compose.onNodeWithText("Add your age below", substring = true).assertExists()
 
             compose.onNodeWithText("Your age").performScrollTo().performTextInput("40")
-            compose.waitUntilAtLeastOneExists(hasText("Save about", substring = true), UI_WAIT)
+            compose.waitUntilAtLeastOneExists(hasText("To retire at 65, in 25 years, save about"), UI_WAIT)
             compose.onNodeWithText("when you retire at 65, in 25 years", substring = true).assertExists()
             compose.waitUntil(UI_WAIT) { runBlocking { app.settings.current().retirement.birthYear } == LocalDate.now().year - 40 }
 
@@ -407,7 +407,7 @@ class AppSmokeTest {
             compose.waitUntil(UI_WAIT) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
 
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-            compose.waitUntilAtLeastOneExists(hasText("by age 67", substring = true), UI_WAIT)
+            compose.waitUntilAtLeastOneExists(hasText("by 67 (", substring = true), UI_WAIT)
         } finally {
             runBlocking { app.settings.setRetirementPlan(com.alexivanov.receiptvault.domain.RetirementPlan()) }
         }
@@ -483,7 +483,7 @@ class AppSmokeTest {
 
         compose.onNodeWithContentDescription("Insights").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Monthly spending"), UI_WAIT)
-        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Average tip"))
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Average receipt"))
         compose.onNodeWithText("Bills").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Nothing repeats regularly yet", substring = true), UI_WAIT)
         compose.onNodeWithText("Future").performClick()

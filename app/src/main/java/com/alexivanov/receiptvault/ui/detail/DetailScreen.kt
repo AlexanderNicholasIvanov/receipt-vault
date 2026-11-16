@@ -181,7 +181,9 @@ fun DetailScreen(id: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
             Text("${category.emoji} ${category.label} · ${formatDateTime(r.purchasedAt)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(money(r.totalCents, r.currency), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
 
-            Card(Modifier.fillMaxWidth()) {
+            // With no subtotal, discount, tax or tip, the card would only repeat the total above.
+            val hasBreakdown = r.subtotalCents != null || (r.discountCents ?: 0) > 0 || r.taxCents != null || r.tipCents != null
+            if (hasBreakdown) Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     r.subtotalCents?.let { AmountRow("Subtotal", money(it, r.currency)) }
                     r.discountCents?.takeIf { it > 0 }?.let { AmountRow("Discount", "−" + money(it, r.currency)) }

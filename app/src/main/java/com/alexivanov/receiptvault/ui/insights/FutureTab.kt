@@ -31,6 +31,8 @@ import com.alexivanov.receiptvault.domain.PriceHistory
 import com.alexivanov.receiptvault.domain.Retirement
 import com.alexivanov.receiptvault.domain.RetirementEstimate
 import com.alexivanov.receiptvault.domain.RetirementPlan
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.roughMoney
 import kotlinx.coroutines.Dispatchers
@@ -128,25 +130,30 @@ private fun InflationCard(plan: RetirementPlan) {
 /** A way into the retirement estimate, with its answer once the user's age is known. */
 @Composable
 internal fun RetirementCard(e: RetirementEstimate, plan: RetirementPlan, currency: String, onOpen: () -> Unit) {
-    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Retirement", style = MaterialTheme.typography.titleMedium)
+            OpensLabel("Retirement", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             if (e.age == null) {
                 Text(
                     "Estimate how much you'd need to retire, based on what your receipts show you spend.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             } else {
                 Text(
-                    "About ${roughMoney(e.neededCents, currency)} by age ${plan.retireAge}",
+                    when {
+                        e.shortfallCents == 0L -> "Your savings cover it"
+                        e.monthlySavingCents > 0 -> "Save about ${roughMoney(e.monthlySavingCents, currency)} a month"
+                        else -> "About ${roughMoney(e.neededCents, currency)} by age ${plan.retireAge}"
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "${roughMoney(e.neededTodayCents, currency)} in today's money, to last until ${plan.planToAge}",
+                    "You'd need about ${roughMoney(e.neededCents, currency)} by ${plan.retireAge} " +
+                        "(${roughMoney(e.neededTodayCents, currency)} in today's money), to last until ${plan.planToAge}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
         }

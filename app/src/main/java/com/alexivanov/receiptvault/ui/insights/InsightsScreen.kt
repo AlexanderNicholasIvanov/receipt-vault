@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,12 +46,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,6 +71,8 @@ import com.alexivanov.receiptvault.domain.RetirementEstimate
 import com.alexivanov.receiptvault.domain.RetirementPlan
 import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.domain.Trend
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.roughMoney
@@ -225,31 +231,31 @@ private fun SpendingTab(
  */
 @Composable
 private fun HeroCard(c: MonthlyCosts, trend: Trend?) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (c.since == null) {
                 Text("What you spend a month", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Add receipts to see what your expenses come to in an average month.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
                 return@Column
             }
-            Text("You spend about", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("You spend about", style = MaterialTheme.typography.labelLarge, color = heroMuted())
             Text("${roughMoney(c.monthlyCents, c.currency)} a month", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
             trend?.let { TrendTag(it) }
             Text(
                 "About ${roughMoney(c.yearlyCents, c.currency)} a year · " +
                     "${c.receipts} ${if (c.receipts == 1) "receipt" else "receipts"} since ${formatDate(c.since)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = heroMuted(),
             )
             if (c.otherCurrencyCount > 0) {
                 Text(
                     "${c.otherCurrencyCount} ${if (c.otherCurrencyCount == 1) "receipt" else "receipts"} in other currencies not included.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
         }
@@ -305,10 +311,16 @@ private fun Tiles(
         } else {
             TileData("Next bill", next.bill.merchant, "${relativeDay(next.date, today, locale)} · ${money(next.bill.typicalCents, c.currency)}", onBills)
         },
-        if (estimate.age == null) {
-            TileData("Retirement", "Plan it", "How much you'd need", onRetirement)
-        } else {
-            TileData("Retirement", "About ${roughMoney(estimate.neededCents, c.currency)}", "by age ${plan.retireAge}", onRetirement)
+        when {
+            estimate.age == null -> TileData("Retirement", "Plan it", "How much you'd need", onRetirement)
+            estimate.shortfallCents == 0L -> TileData("Retirement", "On track", "Your savings cover it", onRetirement)
+            estimate.monthlySavingCents > 0 -> TileData(
+                "Retirement",
+                "Save ${roughMoney(estimate.monthlySavingCents, c.currency)} a month",
+                "About ${roughMoney(estimate.neededCents, c.currency)} by ${plan.retireAge}",
+                onRetirement,
+            )
+            else -> TileData("Retirement", "About ${roughMoney(estimate.neededCents, c.currency)}", "by age ${plan.retireAge}", onRetirement)
         },
         if (top == null) {
             TileData("What you buy", "Everything", "Items and places", { onCategory(null) })
@@ -322,7 +334,7 @@ private fun Tiles(
                 row.forEach { t ->
                     Card(onClick = t.onClick, modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(t.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OpensLabel(t.label)
                             Text(t.value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(t.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -330,6 +342,15 @@ private fun Tiles(
                 }
             }
         }
+    }
+}
+
+/** A card's label with a chevron at the end, so a card that opens a screen looks like it does. */
+@Composable
+internal fun OpensLabel(text: String, style: TextStyle = MaterialTheme.typography.labelMedium, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text, Modifier.weight(1f), style = style, color = color)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -368,15 +389,16 @@ private fun CategoryMonthlyCard(c: MonthlyCosts, onCategory: (Category?) -> Unit
 
 @Composable
 private fun StatsGrid(s: Summary) {
-    val tiles = listOf(
+    // Tips, tax, discounts and subtotals only when the receipts have them: a row of $0.00 says nothing.
+    val tiles = listOfNotNull(
         "Total spent" to money(s.totalCents, s.currency),
         "Receipts" to s.count.toString(),
         "Average receipt" to money(s.averageReceiptCents, s.currency),
-        "Tips" to money(s.tipCents, s.currency),
-        "Average tip" to (s.averageTipPercent?.let { "%.1f%%".format(it) } ?: "—"),
-        "Tax" to money(s.taxCents, s.currency),
-        "Discounts" to money(s.discountCents, s.currency),
-        "Pre-tax subtotal" to money(s.subtotalCents, s.currency),
+        ("Tips" to money(s.tipCents, s.currency)).takeIf { s.tipCents != 0L },
+        s.averageTipPercent?.let { "Average tip" to "%.1f%%".format(it) },
+        ("Tax" to money(s.taxCents, s.currency)).takeIf { s.taxCents != 0L },
+        ("Discounts" to money(s.discountCents, s.currency)).takeIf { s.discountCents != 0L },
+        ("Pre-tax subtotal" to money(s.subtotalCents, s.currency)).takeIf { s.subtotalCents != 0L },
     )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(if (isLargeFont()) 1 else 2).forEach { row ->
@@ -389,6 +411,8 @@ private fun StatsGrid(s: Summary) {
                         }
                     }
                 }
+                // An odd tile out keeps its half width instead of stretching across.
+                if (row.size == 1 && !isLargeFont()) Spacer(Modifier.weight(1f))
             }
         }
     }

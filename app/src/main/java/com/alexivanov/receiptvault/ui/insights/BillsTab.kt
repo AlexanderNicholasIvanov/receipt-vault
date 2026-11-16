@@ -36,6 +36,8 @@ import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.DueBill
 import com.alexivanov.receiptvault.domain.MonthlyCosts
 import com.alexivanov.receiptvault.domain.RecurringCost
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -96,7 +98,7 @@ internal fun relativeDay(date: LocalDate, today: LocalDate, locale: Locale): Str
 @Composable
 private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) {
     val locale = LocalConfiguration.current.locales[0]
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Due in the next 7 days", style = MaterialTheme.typography.titleMedium)
             Text(money(due.sumOf { it.bill.typicalCents }, currency), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -105,7 +107,7 @@ private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) 
                 Text(
                     "Nothing due this week.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
             due.forEach { d ->
@@ -115,11 +117,11 @@ private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) 
                         Text(
                             relativeDay(d.date, today, locale),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = heroMuted(),
                         )
                         PriceChangeTag(d.bill, currency)
                     }
-                    Text("usually ${money(d.bill.typicalCents, currency)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("usually ${money(d.bill.typicalCents, currency)}", color = heroMuted())
                 }
             }
         }

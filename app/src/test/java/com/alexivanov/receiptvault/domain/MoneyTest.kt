@@ -70,4 +70,16 @@ class MoneyTest {
         assertEquals("$300,000", Money.formatWhole(30_000_000, "USD", Locale.US))
         assertEquals("$3", Money.formatWhole(250, "USD", Locale.US))
     }
+
+    @Test
+    fun `estimates keep three significant digits from ten thousand up`() {
+        assertEquals("$614,000", Money.formatEstimate(61_351_400, "USD", Locale.US))
+        assertEquals("$1,330,000", Money.formatEstimate(132_988_576, "USD", Locale.US))
+        assertEquals("$1,000", Money.formatEstimate(100_005, "USD", Locale.US))
+        assertEquals("$9,999", Money.formatEstimate(999_949, "USD", Locale.US))
+        assertEquals("$10,000", Money.formatEstimate(999_950, "USD", Locale.US))
+        assertEquals("$12,300", Money.formatEstimate(1_234_567, "USD", Locale.US))
+        assertEquals("-$45,700", Money.formatEstimate(-4_567_800, "USD", Locale.US))
+        assertEquals("$0", Money.formatEstimate(0, "USD", Locale.US))
+    }
 }

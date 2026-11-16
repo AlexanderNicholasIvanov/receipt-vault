@@ -85,6 +85,17 @@ object Money {
         return nf.format(BigDecimal.valueOf(cents).movePointLeft(2))
     }
 
+    /**
+     * An estimate: whole units, and from 10,000 up only three significant digits, so
+     * $613,514 reads $614,000 and $1,000.05 reads $1,000. The digits past the third are noise
+     * in a projection over decades.
+     */
+    fun formatEstimate(cents: Long, currencyCode: String, locale: Locale = Locale.getDefault()): String {
+        val units = BigDecimal.valueOf(cents).movePointLeft(2).setScale(0, RoundingMode.HALF_UP)
+        val rounded = if (units.abs() < BigDecimal.valueOf(10_000)) units else units.round(java.math.MathContext(3, RoundingMode.HALF_UP))
+        return formatWhole(rounded.movePointRight(2).longValueExact(), currencyCode, locale)
+    }
+
     fun defaultCurrency(locale: Locale = Locale.getDefault()): String =
         runCatching { Currency.getInstance(locale).currencyCode }.getOrNull() ?: "USD"
 }

@@ -45,6 +45,8 @@ import com.alexivanov.receiptvault.ReceiptVaultApp
 import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.ItemHistory
 import com.alexivanov.receiptvault.domain.PriceHistory
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import kotlinx.coroutines.Dispatchers
@@ -125,9 +127,9 @@ private fun Summary(h: ItemHistory) {
     val first = h.points.first()
     val last = h.points.last()
     val cheapest = h.points.minBy { it.unitCents }
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Last paid", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Last paid", style = MaterialTheme.typography.labelLarge, color = heroMuted())
             Text(money(last.unitCents, h.currency), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             val change = h.changePercent
             Text(
@@ -142,7 +144,7 @@ private fun Summary(h: ItemHistory) {
                 Text(
                     "Bought ${h.points.size} times · cheapest ${money(cheapest.unitCents, h.currency)} at ${cheapest.merchant}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
         }

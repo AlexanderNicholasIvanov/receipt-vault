@@ -4,7 +4,11 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.material3.CardColors
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.core.content.FileProvider
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -34,8 +38,19 @@ inline fun <reified VM : ViewModel> appViewModel(crossinline create: (AppContain
 
 fun money(cents: Long, currency: String): String = Money.format(cents, currency)
 
-/** Whole units only, for rough estimates. */
-fun roughMoney(cents: Long, currency: String): String = Money.formatWhole(cents, currency)
+/** Whole units, and three significant digits from 10,000 up, for estimates. */
+fun roughMoney(cents: Long, currency: String): String = Money.formatEstimate(cents, currency)
+
+/** The one card per screen that holds its answer: tinted, so the eye lands on it first. */
+@Composable
+fun heroCardColors(): CardColors = CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+)
+
+/** Secondary text on a hero card: its own ink, softened, since the grey of other cards is too weak on the tint. */
+@Composable
+fun heroMuted(): Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
 
 private val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
 private val timeFormat = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
