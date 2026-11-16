@@ -175,7 +175,7 @@ class SmokeTest {
     private fun screenText(): String =
         device.findObjects(By.textContains("")).mapNotNull { it.text }.filter { it.isNotBlank() }.joinToString(" | ")
 
-    private companion object {
+    companion object {
         const val PACKAGE = "com.alexivanov.receiptvault"
         const val TIMEOUT = 15_000L
     }

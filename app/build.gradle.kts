@@ -128,6 +128,8 @@ ksp {
 }
 
 dependencies {
+    // Applies the baseline profile (src/main/baseline-prof.txt) when installed from GitHub rather than Play.
+    implementation(libs.androidx.profileinstaller)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
