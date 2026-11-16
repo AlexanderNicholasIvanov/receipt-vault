@@ -13,8 +13,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -22,9 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexivanov.receiptvault.ReceiptVaultApp
-import com.alexivanov.receiptvault.data.AppSettings
 import com.alexivanov.receiptvault.domain.MonthlyCosts
 import com.alexivanov.receiptvault.domain.PersonalInflation
 import com.alexivanov.receiptvault.domain.PriceHistory
@@ -35,10 +31,7 @@ import com.alexivanov.receiptvault.ui.heroMuted
 import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.roughMoney
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.time.LocalDate
 
 /** Where today's spending leads: the retirement estimate, and what it adds up to over the years. */
 @Composable
@@ -46,6 +39,7 @@ internal fun FutureTab(
     costs: MonthlyCosts,
     estimate: RetirementEstimate,
     plan: RetirementPlan,
+    inflation: Result<PersonalInflation?>?,
     onRetirement: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -65,7 +59,7 @@ internal fun FutureTab(
             return@LazyColumn
         }
         item { RetirementCard(estimate, plan, costs.currency, onRetirement) }
-        item { InflationCard(plan) }
+        inflation?.let { item { InflationCard(plan, it.getOrNull()) } }
         item { ProjectionCard(costs) }
     }
 }
@@ -75,22 +69,10 @@ internal fun FutureTab(
  * items, with a way to use that rate in the retirement estimate instead of the 3 % default.
  */
 @Composable
-private fun InflationCard(plan: RetirementPlan) {
+private fun InflationCard(plan: RetirementPlan, inflation: PersonalInflation?) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val scope = rememberCoroutineScope()
-    val receipts by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = null)
-    val items by app.receipts.allItems.collectAsStateWithLifecycle(initialValue = null)
-    val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
-    val rates = settings.activeRates
-    // Null while loading; inside, null when there isn't enough history yet.
-    val loaded by produceState<Result<PersonalInflation?>?>(null, receipts, items, settings.defaultCurrency, rates) {
-        val r = receipts ?: return@produceState
-        val i = items ?: return@produceState
-        value = Result.success(withContext(Dispatchers.Default) { PriceHistory.inflation(r, i, settings.defaultCurrency, LocalDate.now(), rates) })
-    }
-    val result = loaded ?: return
-    val inflation = result.getOrNull()
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Your inflation", style = MaterialTheme.typography.titleMedium)

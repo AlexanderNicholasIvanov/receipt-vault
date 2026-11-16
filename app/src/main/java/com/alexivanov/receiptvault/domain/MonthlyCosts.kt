@@ -63,8 +63,14 @@ data class RecurringCost(
      * for that to mean a price rise, so it never counts.
      */
     val priceUp: Boolean
-        get() = previousCents != null && CostEstimate.isCalendarCycle(everyDays) &&
+        get() = isBill && previousCents != null &&
             CostEstimate.isPriceStep(previousCents, latestCents) && latestCents > previousCents
+
+    /**
+     * Paid on a calendar cycle (monthly, quarterly, yearly): a subscription or a bill. Paid every
+     * week or two, it's regular shopping, like the weekly shop or a coffee habit.
+     */
+    val isBill: Boolean get() = CostEstimate.isCalendarCycle(everyDays)
 }
 
 data class MonthlyCosts(
@@ -82,6 +88,12 @@ data class MonthlyCosts(
 ) {
     val yearlyCents: Long get() = monthlyCents * 12
     val recurringMonthlyCents: Long get() = recurring.sumOf { it.monthlyCents }
+
+    /** Subscriptions and bills: the recurring costs on a calendar cycle. */
+    val bills: List<RecurringCost> get() = recurring.filter { it.isBill }
+
+    /** Places paid at a steady pace that isn't a calendar cycle: the weekly shop, a coffee habit. */
+    val regularShopping: List<RecurringCost> get() = recurring.filterNot { it.isBill }
 }
 
 /**

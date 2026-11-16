@@ -135,6 +135,17 @@ class MonthlyCostsTest {
     }
 
     @Test
+    fun `monthly payments are bills, and weekly ones regular shopping`() {
+        val receipts = monthly(1_599, 1_599, 1_599) +
+            monthly(8_000, 9_100, 8_500, merchant = "City Power") +
+            (0..5).map { w -> receipt(today.minusWeeks(w.toLong()), 5_000, "Kroger", Category.GROCERIES) }
+        val c = costs(receipts)
+        assertEquals(listOf("City Power", "Netflix"), c.bills.map { it.merchant })
+        assertEquals(listOf("Kroger"), c.regularShopping.map { it.merchant })
+        assertEquals(c.recurring.size, c.bills.size + c.regularShopping.size)
+    }
+
+    @Test
     fun `a weekly shop is recurring, with store numbers and case ignored`() {
         val receipts = (0..7).map { w ->
             receipt(today.minusWeeks(w.toLong()), if (w % 2 == 0) 5_000 else 7_000, if (w % 2 == 0) "Shell #4521" else "SHELL #330", Category.FUEL)

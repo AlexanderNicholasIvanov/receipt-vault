@@ -306,8 +306,8 @@ class AppSmokeTest {
         compose.onNodeWithText("Nothing due this week.").assertExists()
         // Paid today; next month's is the only one due.
         compose.onNodeWithText("1 of 1 paid").assertExists()
-        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Recurring costs"))
-        compose.onNodeWithText("Recurring: $15.99 a month from 1 regular payment").assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Subscriptions & bills"))
+        compose.onNodeWithText("$15.99 a month from 1 place").assertExists()
         compose.onNodeWithText("Every month · usually $15.99", substring = true).assertExists()
 
         compose.onNodeWithText("Future").performClick()
@@ -483,7 +483,6 @@ class AppSmokeTest {
 
         compose.onNodeWithContentDescription("Insights").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Monthly spending"), UI_WAIT)
-        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Average receipt"))
         compose.onNodeWithText("Bills").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Nothing repeats regularly yet", substring = true), UI_WAIT)
         compose.onNodeWithText("Future").performClick()
