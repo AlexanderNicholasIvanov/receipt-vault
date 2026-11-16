@@ -435,6 +435,31 @@ class AppSmokeTest {
         compose.onNodeWithText("Dining, as on your", substring = true).assertDoesNotExist()
     }
 
+    @Test
+    fun `a pile of receipts can be typed in one after another`() {
+        compose.waitForEmptyHome()
+        compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+        compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+        compose.onNodeWithText("Merchant").performTextInput("First Shop")
+        compose.onNodeWithText("Total").performTextInput("12.00")
+        compose.onNodeWithText("Save and add another").performScrollTo().performClick()
+
+        // Straight into an empty form for the next one.
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("First Shop").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), 5_000)
+        compose.onNodeWithText("Merchant").performTextInput("Second Shop")
+        compose.onNodeWithText("Total").performTextInput("7.50")
+        compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
+
+        // The last one opens as usual; both are saved.
+        compose.waitUntilAtLeastOneExists(hasText("$7.50"), 10_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("First Shop"), 5_000)
+        compose.onNodeWithText("Second Shop").assertExists()
+    }
+
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)

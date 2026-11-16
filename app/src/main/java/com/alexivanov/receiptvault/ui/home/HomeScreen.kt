@@ -107,7 +107,8 @@ fun HomeScreen(
     onManual: () -> Unit,
     onInsights: () -> Unit,
     onSettings: () -> Unit,
-    scanRequests: Flow<Unit> = emptyFlow(),
+    /** Start the scanner or camera without a tap on Home: a Scan shortcut, or the next receipt of a pile. */
+    captureRequests: Flow<CaptureSource> = emptyFlow(),
 ) {
     val vm = appViewModel { app, _ -> HomeViewModel(app) }
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -156,7 +157,11 @@ fun HomeScreen(
         onError = { msg -> scope.launch { snackbar.showSnackbar(msg) } },
     )
     // "Scan receipt" from an app shortcut, the Quick Settings tile or the widget.
-    LaunchedEffect(scanRequests) { scanRequests.collect { capture.scan() } }
+    LaunchedEffect(captureRequests) {
+        captureRequests.collect { source ->
+            if (source == CaptureSource.CAMERA) capture.camera() else capture.scan()
+        }
+    }
 
     Scaffold(
         topBar = {

@@ -119,6 +119,20 @@ class ReviewViewModel(
     /** One photo, several scanned pages, or a PDF. */
     private val imageUris: List<String> = PageUris.decode(handle.get<String>("uri"))
 
+    private val source: CaptureSource =
+        CaptureSource.entries.firstOrNull { it.name == handle.get<String>("source") } ?: CaptureSource.MANUAL
+
+    /**
+     * A new receipt from the scanner, the camera or typed in can be saved straight into the next
+     * one of the same kind, for a pile of receipts at once. Null when that makes no sense: editing,
+     * or a photo shared from another app.
+     */
+    val next: CaptureSource? = source.takeIf { receiptId == 0L && it in setOf(CaptureSource.SCAN, CaptureSource.CAMERA, CaptureSource.MANUAL) }
+
+    /** The last save asked for the next receipt; read once [saved] is set. */
+    var thenNext = false
+        private set
+
     private val _state = MutableStateFlow<ReviewState>(ReviewState.Working("Starting…"))
     val state: StateFlow<ReviewState> = _state
 
@@ -375,10 +389,14 @@ class ReviewViewModel(
 
     fun dismissDuplicate() = _state.update { s -> if (s is ReviewState.Editing) s.copy(duplicateOf = null) else s }
 
-    /** @param allowDuplicate the user has seen the "already saved?" question and wants a second copy. */
-    fun save(allowDuplicate: Boolean = false) {
+    /**
+     * @param allowDuplicate the user has seen the "already saved?" question and wants a second copy.
+     * @param thenNext go on to the next receipt; kept from the first tap when "Save anyway" follows.
+     */
+    fun save(allowDuplicate: Boolean = false, thenNext: Boolean = this.thenNext) {
         val s = _state.value as? ReviewState.Editing ?: return
         if (saving) return
+        this.thenNext = thenNext && next != null
         val d = s.draft
         val total = Money.parseUserInput(d.total) ?: d.computedTotal
         if (total == null) {

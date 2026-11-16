@@ -73,16 +73,16 @@ fun AppNav(
     quickActions: Flow<QuickAction> = emptyFlow(),
     nav: NavHostController = rememberNavController(),
 ) {
-    // Scans are launched by Home, which owns the scanner; it takes each request exactly once.
-    val scanRequests = remember { Channel<Unit>(Channel.CONFLATED) }
-    val scanRequestFlow = remember { scanRequests.receiveAsFlow() }
+    // Scans and photos are launched by Home, which owns the scanner and camera; it takes each request exactly once.
+    val captureRequests = remember { Channel<CaptureSource>(Channel.CONFLATED) }
+    val captureRequestFlow = remember { captureRequests.receiveAsFlow() }
     var reviewHasUnsavedWork by remember { mutableStateOf(false) }
     // A widget, tile or shortcut tapped while a receipt is half filled in; waits for an answer.
     var waitingAction by remember { mutableStateOf<QuickAction?>(null) }
     fun start(action: QuickAction) {
         nav.popBackStack(Routes.HOME, inclusive = false)
         when (action) {
-            QuickAction.SCAN -> scanRequests.trySend(Unit)
+            QuickAction.SCAN -> captureRequests.trySend(CaptureSource.SCAN)
             QuickAction.MANUAL -> nav.navigate(Routes.review())
         }
     }
@@ -114,7 +114,7 @@ fun AppNav(
                 onManual = { entry.ifResumed { nav.navigate(Routes.review()) } },
                 onInsights = { entry.ifResumed { nav.navigate(Routes.INSIGHTS) } },
                 onSettings = { entry.ifResumed { nav.navigate(Routes.SETTINGS) } },
-                scanRequests = scanRequestFlow,
+                captureRequests = captureRequestFlow,
             )
         }
         composable(
@@ -128,6 +128,11 @@ fun AppNav(
             ReviewScreen(
                 onBack = { entry.ifResumed { nav.popBackStack() } },
                 onUnsavedWork = { reviewHasUnsavedWork = it },
+                // Saved, and on to the next receipt of a pile: back to Home, which starts the same kind of capture.
+                onNext = { source ->
+                    nav.popBackStack(Routes.HOME, inclusive = false)
+                    if (source == CaptureSource.MANUAL) nav.navigate(Routes.review()) else captureRequests.trySend(source)
+                },
                 onSaved = { id ->
                     // Replace the editor with the saved receipt; editing an existing one just returns to it.
                     nav.popBackStack()
