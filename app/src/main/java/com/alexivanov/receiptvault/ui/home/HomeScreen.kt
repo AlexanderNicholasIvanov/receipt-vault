@@ -109,6 +109,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     /** Start the scanner or camera without a tap on Home: a Scan shortcut, or the next receipt of a pile. */
     captureRequests: Flow<CaptureSource> = emptyFlow(),
+    modifier: Modifier = Modifier,
 ) {
     val vm = appViewModel { app, _ -> HomeViewModel(app) }
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -164,6 +165,7 @@ fun HomeScreen(
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             if (selecting) {
                 TopAppBar(
