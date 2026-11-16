@@ -3,12 +3,14 @@ package com.alexivanov.receiptvault
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -40,14 +42,16 @@ class NavigationTest {
     @Test
     fun `a double tap on Back leaves one screen, not two`() {
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.goTo("Settings")
         compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
+        compose.onNodeWithText("Trash").performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Back"), UI_WAIT)
 
         // Both taps land before the screen has gone.
         val back = compose.onNodeWithContentDescription("Back").fetchSemanticsNode()
         compose.runOnUiThread { repeat(2) { back.config[SemanticsActions.OnClick].action!!.invoke() } }
 
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
+        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
     }
 
     @Test

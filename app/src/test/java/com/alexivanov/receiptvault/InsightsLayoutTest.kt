@@ -4,7 +4,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
@@ -34,7 +33,7 @@ class InsightsLayoutTest {
     private val app get() = (compose.activity.application as ReceiptVaultApp).container
 
     private fun openInsights() {
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("Bills"), UI_WAIT)
     }
 
