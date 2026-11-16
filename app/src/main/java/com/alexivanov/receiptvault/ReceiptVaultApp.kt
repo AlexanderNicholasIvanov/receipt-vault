@@ -18,6 +18,7 @@ import com.alexivanov.receiptvault.scan.ImageStore
 import com.alexivanov.receiptvault.scan.PdfPages
 import com.alexivanov.receiptvault.scan.TextReader
 import com.alexivanov.receiptvault.update.GitHubApkDownloader
+import com.alexivanov.receiptvault.update.ReleaseSource
 import com.alexivanov.receiptvault.update.UpdateChecker
 import com.alexivanov.receiptvault.update.UpdateController
 import kotlinx.coroutines.CoroutineScope
@@ -27,22 +28,25 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-class ReceiptVaultApp : Application() {
+open class ReceiptVaultApp : Application() {
     lateinit var container: AppContainer
         private set
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(this)
+        container = AppContainer(this, releaseSource())
         // WorkManager may be unavailable in some test environments; reminders then run at app start only.
         runCatching { AlertWorker.schedule(this) }
         // Play services may be missing (tests, some ROMs); scanning then explains instead.
         runCatching { container.textReader.prepare() }
     }
+
+    /** Where updates come from: GitHub Releases. Unit tests answer "up to date" without the network. */
+    protected open fun releaseSource(): ReleaseSource = UpdateChecker(BuildConfig.UPDATE_REPO)
 }
 
 /** Hand-rolled dependency container; the app is small enough not to need a DI framework. */
-class AppContainer(val context: Context) {
+class AppContainer(val context: Context, releaseSource: ReleaseSource) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val database = AppDatabase.create(context)
@@ -65,7 +69,7 @@ class AppContainer(val context: Context) {
     /** Check GitHub Releases, download the newer APK in-app, hand it to the installer. */
     val updates = UpdateController(
         scope = appScope,
-        source = UpdateChecker(BuildConfig.UPDATE_REPO),
+        source = releaseSource,
         downloader = apkDownloader,
         currentVersionCode = BuildConfig.VERSION_CODE,
     )

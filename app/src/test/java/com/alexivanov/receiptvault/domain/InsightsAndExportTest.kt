@@ -34,6 +34,18 @@ class InsightsAndExportTest {
     )
 
     @Test
+    fun `the overview is the summary, monthly totals and monthly costs together`() {
+        val o = Insights.overview(receipts, Period.THIS_MONTH, "USD", today, zone = utc)
+        assertEquals(Insights.summarize(Insights.inPeriod(receipts, Period.THIS_MONTH, today, utc), "USD"), o.summary)
+        assertEquals(Insights.monthly(receipts, o.summary.currency, today, zone = utc), o.monthly)
+        assertEquals(CostEstimate.monthly(receipts, "USD", today, zone = utc), o.costs)
+        // The period only narrows the summary: the 6-month chart and monthly costs use everything.
+        val year = Insights.overview(receipts, Period.THIS_YEAR, "USD", today, zone = utc)
+        assertEquals(o.monthly, year.monthly)
+        assertEquals(o.costs, year.costs)
+    }
+
+    @Test
     fun `period filters by local purchase date`() {
         assertEquals(setOf(1L, 2L, 4L), Insights.inPeriod(receipts, Period.THIS_MONTH, today, utc).map { it.id }.toSet())
         assertEquals(listOf(3L), Insights.inPeriod(receipts, Period.LAST_MONTH, today, utc).map { it.id })

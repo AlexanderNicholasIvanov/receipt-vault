@@ -130,6 +130,16 @@ android {
     }
 }
 
+composeCompiler {
+    // The app's models and read-only collections are immutable; see the file for the list.
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+    // ./gradlew assembleRelease -Preceiptvault.composeReports writes stability reports to build/compose.
+    if (providers.gradleProperty("receiptvault.composeReports").isPresent) {
+        reportsDestination = layout.buildDirectory.dir("compose")
+        metricsDestination = layout.buildDirectory.dir("compose")
+    }
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }

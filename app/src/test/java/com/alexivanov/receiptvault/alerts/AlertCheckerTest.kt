@@ -14,6 +14,7 @@ import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Budgets
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.Reminder
+import com.alexivanov.receiptvault.domain.SpendingAlert
 import com.alexivanov.receiptvault.scan.ImageStore
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -49,6 +50,8 @@ class AlertCheckerTest {
             settings.setBudgets(Budgets())
             settings.setSentAlerts(emptySet())
             settings.setDefaultCurrency("USD")
+            settings.setSpendingAlerts(true)
+            settings.setBillReminders(false)
         }
     }
 
@@ -119,8 +122,40 @@ class AlertCheckerTest {
         assertEquals(1, checker.run(today, zone).size)
     }
 
+    private suspend fun monthlyBill(merchant: String, cents: List<Long>, last: LocalDate) = cents.forEachIndexed { i, c ->
+        val date = last.minusMonths((cents.size - 1 - i).toLong())
+        repo.save(
+            Receipt(merchant = merchant, category = Category.ENTERTAINMENT.name, totalCents = c, currency = "USD", purchasedAt = date.atTime(10, 0).toInstant(zone).toEpochMilli(), createdAt = 0, updatedAt = 0),
+            emptyList(),
+        )
+    }
+
+    @Test
+    fun `a price rise is sent once, and bill reminders only when turned on`() = runBlocking {
+        monthlyBill("Netflix", listOf(1_599, 1_599, 1_599, 1_799), last = today.minusDays(2))
+        monthlyBill("City Gym", listOf(4_000, 4_000, 4_000, 4_000), last = today.plusDays(1).minusMonths(1))
+
+        assertEquals(listOf("price:netflix:2026-11-04"), checker.run(today, zone))
+        assertTrue(checker.run(today, zone).isEmpty())
+
+        settings.setBillReminders(true)
+        assertEquals(listOf("due:city gym:2026-11-07"), checker.run(today, zone))
+        assertEquals(listOf("Netflix", "City Gym"), notifier.spending.map { (it as? SpendingAlert.PriceUp)?.bill?.merchant ?: (it as SpendingAlert.DueTomorrow).bill.merchant })
+    }
+
+    @Test
+    fun `spending changes can be turned off`() = runBlocking {
+        settings.setSpendingAlerts(false)
+        monthlyBill("Netflix", listOf(1_599, 1_599, 1_599, 1_799), last = today.minusDays(2))
+        assertTrue(checker.run(today, zone).isEmpty())
+        assertTrue(notifier.spending.isEmpty())
+    }
+
     @Test
     fun `old keys are pruned`() {
+        assertTrue(checker.isRecent("category:DINING:2026-10", today))
+        assertFalse(checker.isRecent("category:DINING:2026-05", today))
+        assertTrue(checker.isRecent("price:netflix:2026-11-04", today))
         assertTrue(checker.isRecent("return:1:2026-11-01", today))
         assertTrue(checker.isRecent("budget:2026-08:ALL:NEAR", today))
         assertFalse(checker.isRecent("return:1:2026-01-01", today))
@@ -141,5 +176,7 @@ class AlertCheckerTest {
         override fun enabled() = on
         override fun reminder(reminder: Reminder, hideDetails: Boolean) { reminders += reminder }
         override fun budget(use: BudgetUse, currency: String, hideDetails: Boolean) { budgets += use }
+        val spending = mutableListOf<SpendingAlert>()
+        override fun spending(alert: SpendingAlert, currency: String, hideDetails: Boolean) { spending += alert }
     }
 }

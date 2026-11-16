@@ -27,7 +27,20 @@ data class RecurringCost(
     val monthlyCents: Long,
     val lastDate: LocalDate,
     val nextDate: LocalDate,
-)
+    /** The most recent payment. */
+    val latestCents: Long = typicalCents,
+    /** The payment before it. */
+    val previousCents: Long? = null,
+) {
+    /**
+     * The latest payment of a bill on a calendar cycle (a subscription, a monthly bill) is at
+     * least 5 % and one currency unit more than the one before. Weekly shopping varies too much
+     * for that to mean a price rise, so it never counts.
+     */
+    val priceUp: Boolean
+        get() = previousCents != null && CostEstimate.isCalendarCycle(everyDays) &&
+            latestCents - previousCents >= maxOf(100L, Math.floorDiv(previousCents + 19, 20))
+}
 
 data class MonthlyCosts(
     val currency: String,
@@ -122,7 +135,8 @@ object CostEstimate {
                 // Stopped: more than two missed payments ago, with a week's slack.
                 val stopped = ChronoUnit.DAYS.between(last, today) > every * 2 + 7
                 if (!steady || stopped) return@mapNotNull null
-                val typical = median(byDay.values.map { day -> day.sumOf { it.totalCents } })
+                val payments = byDay.values.map { day -> day.sumOf { it.totalCents } }
+                val typical = median(payments)
                 val latest = list.maxBy { it.purchasedAt }
                 RecurringCost(
                     merchant = latest.merchant.trim(),
@@ -132,7 +146,9 @@ object CostEstimate {
                     everyDays = every.toInt(),
                     monthlyCents = perMonthEvery(typical, every),
                     lastDate = last,
-                    nextDate = last.plusDays(every),
+                    nextDate = dueDate(last, every.toInt(), 1),
+                    latestCents = payments.last(),
+                    previousCents = payments[payments.size - 2],
                 )
             }
             .sortedByDescending { it.monthlyCents }
@@ -147,6 +163,19 @@ object CostEstimate {
         val numerator = if (months != null) cents else cents * MONTH_NUM
         return Math.floorDiv(numerator + denominator / 2, denominator)
     }
+
+    /**
+     * The [n]th payment after [last] for a bill paid every [everyDays] days. Bills on a calendar
+     * cycle keep their day of the month (the 15th stays the 15th, and the 31st becomes the last
+     * day of a shorter month); other bills step by days.
+     */
+    fun dueDate(last: LocalDate, everyDays: Int, n: Long): LocalDate {
+        val months = calendarMonths(everyDays)
+        return if (months != null) last.plusMonths(months * n) else last.plusDays(everyDays * n)
+    }
+
+    /** A gap of [days] days is a calendar cycle: monthly, every 2, 3 or 6 months, or yearly. */
+    fun isCalendarCycle(days: Int): Boolean = calendarMonths(days) != null
 
     /** The calendar cycle a gap of [days] days stands for: 1, 2, 3, 6 or 12 months; null for other gaps. */
     private fun calendarMonths(days: Int): Int? = when (days) {
