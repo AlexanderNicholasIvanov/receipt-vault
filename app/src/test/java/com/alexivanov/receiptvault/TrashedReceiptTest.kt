@@ -55,12 +55,12 @@ class TrashedReceiptTest {
     fun `a trashed receipt says so and can be restored, not edited`() {
         val id = trashedReceipt()
         ActivityScenario.launch<MainActivity>(open(id)).use {
-            compose.waitUntilAtLeastOneExists(hasText("In the trash", substring = true), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("In the trash", substring = true), UI_WAIT)
             compose.onNodeWithContentDescription("Edit").assertDoesNotExist()
             compose.onNodeWithContentDescription("Move to trash").assertDoesNotExist()
 
             compose.onNodeWithText("Restore").performClick()
-            compose.waitUntilDoesNotExist(hasText("In the trash", substring = true), 10_000)
+            compose.waitUntilDoesNotExist(hasText("In the trash", substring = true), UI_WAIT)
             compose.onNodeWithContentDescription("Edit").assertExists()
         }
     }
@@ -68,7 +68,7 @@ class TrashedReceiptTest {
     @Test
     fun `a receipt deleted for good explains itself`() {
         ActivityScenario.launch<MainActivity>(open(987_654)).use {
-            compose.waitUntilAtLeastOneExists(hasText("This receipt no longer exists."), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("This receipt no longer exists."), UI_WAIT)
         }
     }
 
@@ -104,7 +104,7 @@ class TrashedReceiptTest {
     }
 
     private fun waitFor(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
+        val deadline = System.currentTimeMillis() + UI_WAIT
         while (!condition()) {
             assertTrue("timed out", System.currentTimeMillis() < deadline)
             shadowOf(Looper.getMainLooper()).idle()
