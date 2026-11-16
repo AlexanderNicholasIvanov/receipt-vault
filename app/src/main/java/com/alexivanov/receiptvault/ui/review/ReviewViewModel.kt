@@ -21,6 +21,7 @@ import com.alexivanov.receiptvault.domain.Problems
 import com.alexivanov.receiptvault.domain.ReceiptParser
 import com.alexivanov.receiptvault.domain.Tags
 import com.alexivanov.receiptvault.domain.UserFacingException
+import com.alexivanov.receiptvault.scan.OcrNotReadyException
 import com.alexivanov.receiptvault.scan.PdfPages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -274,6 +275,11 @@ class ReviewViewModel(
             ocrText = rows.joinToString("\n") { it.text }
             if (rows.isEmpty()) notice = "No text found. Fill in the details by hand, or retake the photo in better light."
             withContext(Dispatchers.Default) { ReceiptParser.parse(rows, LocalDate.now(), settings.dayFirstDates) }
+        } catch (e: OcrNotReadyException) {
+            Log.w(TAG, "OCR model not downloaded yet", e)
+            notice = "Text reading is still downloading through Google Play services. Fill in the details by hand, " +
+                "or scan again in a minute."
+            ParsedReceipt()
         } catch (e: Exception) {
             Log.w(TAG, "Text recognition failed", e)
             notice = "Couldn't read the text on this receipt. Fill in the details by hand."

@@ -60,6 +60,7 @@ Requirements: JDK 21 and the Android SDK (platform 37). Android Studio works, or
 ```sh
 ./gradlew lintDebug testDebugUnitTest assembleDebug   # what CI runs
 ./gradlew installDebug                                  # onto a connected phone/emulator
+./gradlew :smoketest:connectedBenchmarkAndroidTest      # minified app, clicked through on an emulator
 ```
 
 Layout:
@@ -67,17 +68,18 @@ Layout:
 | Path | What |
 |---|---|
 | `app/src/main/java/.../domain/` | Pure Kotlin, unit tested. `ReceiptParser` (OCR text → amounts, date, merchant…), `LineAssembler` (joins label/price columns), `Money`, `Insights`, `CsvExport` |
-| `.../scan/` | ML Kit OCR and photo storage |
+| `.../scan/` | ML Kit OCR (model supplied by Google Play services, recognition on the phone) and photo storage |
 | `.../data/` | Room database (`receipts`, `line_items`) and DataStore settings |
 | `.../ui/` | Jetpack Compose screens: home, review/edit, detail, insights, settings |
 | `.../update/` | GitHub Releases check, in-app APK download + verification, installer hand-off |
+| `smoketest/` | UI Automator test that runs the R8-minified app on an emulator |
 
 The receipt parser is heuristic. If a real receipt is misread, add its text as a case in `ReceiptParserTest` and fix the parser against it.
 
 ## Releases and signing
 
-- `ci.yml` runs lint, unit tests and a debug build on every push and PR.
-- `release.yml` runs on every push to `main`. It builds a release APK signed with the release key, tags it `v1.0.<run number>` and publishes it as a GitHub Release with the asset `ReceiptVault.apk`.
+- `ci.yml` runs lint, unit tests and a debug build on every push and PR. A second job builds the app the way it is released (minified by R8, debug-signed) and clicks through it on an emulator, because code R8 wrongly removes only fails at runtime.
+- `release.yml` runs on every push to `main`. It builds a release APK signed with the release key, tags it `v1.0.<run number>` and publishes it as a GitHub Release with the asset `ReceiptVault.apk` (about 5 MB) and R8's `mapping.txt`. To read a crash's stack trace from a release, run `retrace mapping.txt stacktrace.txt` (in the Android SDK's `cmdline-tools`).
 - The signing key lives in the repository's Actions secrets: `RV_KEYSTORE_B64`, `RV_KEYSTORE_PASSWORD`, `RV_KEY_ALIAS` and `RV_KEY_PASSWORD`. **Keep an offline backup of the keystore.** If it is lost, future builds cannot update existing installs, and users would have to uninstall, which deletes their receipts. Back up first (Settings → Back up receipts), then restore after reinstalling.
 
 **Roll back a bad release:** delete the bad GitHub Release so the previous one becomes *latest*. Phones that already updated need the older APK installed after uninstalling, because Android blocks downgrades. Usually it's better to revert the commit on `main`, which publishes a fixed, higher version.

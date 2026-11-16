@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Update check and download from GitHub Releases. OCR runs fully on-device. -->
+    <!-- Update check and download from GitHub Releases. OCR runs fully on-device (its model
+         comes from Google Play services). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- In-app updates: hand a downloaded, verified release APK to the system
          installer. The user still confirms every install. -->
@@ -61,6 +62,12 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
+
+        <!-- Installs from an app store fetch the OCR model with the app; sideloaded installs
+             ask for it at first launch (TextReader.prepare). -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
 
         <!-- Quick Settings tile: one tap to scan a receipt. -->
         <service
