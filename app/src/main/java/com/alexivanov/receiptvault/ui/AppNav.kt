@@ -26,6 +26,7 @@ import com.alexivanov.receiptvault.ui.detail.DetailScreen
 import com.alexivanov.receiptvault.ui.home.HomeScreen
 import com.alexivanov.receiptvault.ui.insights.CategoryScreen
 import com.alexivanov.receiptvault.ui.insights.InsightsScreen
+import com.alexivanov.receiptvault.ui.insights.RetirementScreen
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.review.CaptureSource
 import com.alexivanov.receiptvault.ui.review.ReviewScreen
@@ -42,6 +43,7 @@ private object Routes {
     const val DETAIL = "receipt/{id}"
     const val INSIGHTS = "insights"
     const val CATEGORY = "insights/category/{name}"
+    const val RETIREMENT = "insights/retirement"
     const val SETTINGS = "settings"
     const val TRASH = "trash"
     const val BUDGETS = "budgets"
@@ -136,8 +138,10 @@ fun AppNav(
             InsightsScreen(
                 onBack = { entry.ifResumed { nav.popBackStack() } },
                 onCategory = { entry.ifResumed { nav.navigate(Routes.category(it)) } },
+                onRetirement = { entry.ifResumed { nav.navigate(Routes.RETIREMENT) } },
             )
         }
+        composable(Routes.RETIREMENT) { entry -> RetirementScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }
         composable(Routes.CATEGORY, arguments = listOf(navArgument("name") { type = NavType.StringType })) { entry ->
             val name = entry.arguments?.getString("name") ?: Routes.ALL
             CategoryScreen(

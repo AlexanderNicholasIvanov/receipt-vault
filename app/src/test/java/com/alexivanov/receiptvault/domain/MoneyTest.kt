@@ -63,4 +63,11 @@ class MoneyTest {
         assertEquals(listOf(23456L), cents("Coffee 1 234,56"))
         assertEquals(listOf(10000L), Money.findAll("Qty 2 100.00", spacedThousands = true).map { it.cents })
     }
+
+    @Test
+    fun `rough amounts are rounded to whole units`() {
+        assertEquals("$1,329,886", Money.formatWhole(132_988_576, "USD", Locale.US))
+        assertEquals("$300,000", Money.formatWhole(30_000_000, "USD", Locale.US))
+        assertEquals("$3", Money.formatWhole(250, "USD", Locale.US))
+    }
 }

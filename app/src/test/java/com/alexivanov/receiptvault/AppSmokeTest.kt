@@ -327,6 +327,38 @@ class AppSmokeTest {
         compose.onNodeWithText("Bananas").assertExists()
     }
 
+    @Test
+    fun `retirement estimate uses the receipts and remembers the age`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        try {
+            runBlocking {
+                app.settings.setDefaultCurrency("USD")
+                val now = System.currentTimeMillis()
+                app.receipts.save(Receipt(merchant = "Kroger", category = Category.GROCERIES.name, totalCents = 100_000, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now), emptyList())
+            }
+            compose.waitUntilAtLeastOneExists(hasText("Kroger"), 10_000)
+
+            compose.onNodeWithContentDescription("Insights").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Retirement"), 5_000)
+            compose.onNodeWithText("Retirement").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Spending in retirement"), 5_000)
+            // $1,000 a month from receipts; 25 years of it is the rule of thumb.
+            compose.onNodeWithText("Rule of thumb (25 times a year's spending): $300,000 in today's money.").assertExists()
+            compose.onNodeWithText("Add your age below", substring = true).assertExists()
+
+            compose.onNodeWithText("Your age").performScrollTo().performTextInput("40")
+            compose.waitUntilAtLeastOneExists(hasText("Save about", substring = true), 5_000)
+            compose.onNodeWithText("when you retire at 65, in 25 years", substring = true).assertExists()
+            compose.waitUntil(5_000) { runBlocking { app.settings.current().retirement.birthYear } == LocalDate.now().year - 40 }
+
+            compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            compose.waitUntilAtLeastOneExists(hasText("by age 65", substring = true), 5_000)
+        } finally {
+            runBlocking { app.settings.setRetirementPlan(com.alexivanov.receiptvault.domain.RetirementPlan()) }
+        }
+    }
+
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
