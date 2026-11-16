@@ -85,5 +85,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: smoke-test-results
-          path: smoketest/build/outputs/androidTest-results/
+          # Test results, logcat, and the screenshot a failing step saves.
+          path: smoketest/build/outputs/
           if-no-files-found: ignore

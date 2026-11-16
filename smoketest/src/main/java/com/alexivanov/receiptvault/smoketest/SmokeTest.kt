@@ -21,6 +21,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
+import java.io.File
 
 /**
  * Clicks through the minified app like a user would. Most R8 mistakes (a class or member
@@ -121,7 +123,17 @@ class SmokeTest {
 
     private fun waitFor(selector: BySelector, timeout: Long = TIMEOUT): UiObject2 =
         device.wait(Until.findObject(selector), timeout)
-            ?: throw AssertionError("Not on screen: $selector\n${screenText()}")
+            ?: throw AssertionError("Not on screen: $selector\n${screenText()}\n${saveScreen()}")
+
+    /** Saves a screenshot and returns the window hierarchy, so a CI failure can be read afterwards. */
+    private fun saveScreen(): String {
+        InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let { dir ->
+            device.takeScreenshot(File(dir, "failure-${System.currentTimeMillis()}.png"))
+        }
+        val xml = ByteArrayOutputStream()
+        runCatching { device.dumpWindowHierarchy(xml) }
+        return xml.toString(Charsets.UTF_8.name())
+    }
 
     /** Waits for [selector], scrolling down the screen's list if it is further down. */
     private fun find(selector: BySelector): UiObject2 {
