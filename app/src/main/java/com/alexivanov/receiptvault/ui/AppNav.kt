@@ -145,6 +145,7 @@ fun AppNav(
                     onManual = { entry.ifResumed { nav.navigate(Routes.review()) } },
                     onInsights = { entry.ifResumed { nav.navigate(Routes.INSIGHTS) } },
                     onSettings = { entry.ifResumed { nav.navigate(Routes.SETTINGS) } },
+                    onCategory = { entry.ifResumed { nav.navigate(Routes.category(it)) } },
                     captureRequests = captureRequestFlow,
                     modifier = modifier,
                 )

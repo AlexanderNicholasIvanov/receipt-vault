@@ -45,17 +45,21 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** What's due soon, what's paid this month, and every regular payment found in the receipts. */
+/**
+ * What's due soon and what's paid this month, for subscriptions and bills; then every regular
+ * payment found in the receipts, bills apart from regular shopping like the weekly shop.
+ */
 @Composable
 internal fun BillsTab(costs: MonthlyCosts, today: LocalDate, modifier: Modifier = Modifier) {
-    val upcoming = remember(costs.recurring, today) { Bills.upcoming(costs.recurring, today) }
-    val month = remember(costs.recurring, today) { Bills.thisMonth(costs.recurring, today) }
+    val bills = costs.bills
+    val upcoming = remember(bills, today) { Bills.upcoming(bills, today) }
+    val month = remember(bills, today) { Bills.thisMonth(bills, today) }
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (costs.recurring.isNotEmpty()) {
+        if (bills.isNotEmpty()) {
             item { DueSoonCard(upcoming, costs.currency, today) }
             if (month.due > 0) {
                 item {
@@ -82,8 +86,29 @@ internal fun BillsTab(costs: MonthlyCosts, today: LocalDate, modifier: Modifier 
                 }
             }
         }
-        item { SectionTitle("Recurring costs") }
-        item { RecurringCosts(costs) }
+        if (costs.recurring.isEmpty()) {
+            item { SectionTitle("Recurring costs") }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Text(
+                        "Nothing repeats regularly yet. A place you pay at a steady pace, " +
+                            "${CostEstimate.MIN_PAYMENTS} or more times, shows up here.",
+                        Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (bills.isNotEmpty()) {
+            item { SectionTitle("Subscriptions & bills") }
+            item { RecurringList(bills, costs.currency) }
+        }
+        val shopping = costs.regularShopping
+        if (shopping.isNotEmpty()) {
+            item { SectionTitle("Regular shopping") }
+            item { RecurringList(shopping, costs.currency) }
+        }
     }
 }
 
@@ -174,34 +199,25 @@ private fun PriceChangeTag(bill: RecurringCost, currency: String) {
     )
 }
 
-/** Merchants paid at a steady pace, with their usual amount and when the next one is due. */
+/** Merchants paid at a steady pace, what they come to a month, their usual amount and when the next one is due. */
 @Composable
-private fun RecurringCosts(c: MonthlyCosts) {
+private fun RecurringList(list: List<RecurringCost>, currency: String) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (c.recurring.isEmpty()) {
-                Text(
-                    "Nothing repeats regularly yet. A place you pay at a steady pace, " +
-                        "${CostEstimate.MIN_PAYMENTS} or more times, shows up here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    "Recurring: ${money(c.recurringMonthlyCents, c.currency)} a month from ${c.recurring.size} regular " +
-                        if (c.recurring.size == 1) "payment" else "payments",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            c.recurring.forEach { r ->
+            Text(
+                "${money(list.sumOf { it.monthlyCents }, currency)} a month from ${list.size} " +
+                    if (list.size == 1) "place" else "places",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            list.forEach { r ->
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
-                    LabelValue("${r.category.emoji} ${r.merchant}", "${money(r.monthlyCents, c.currency)} a month", labelWeight = FontWeight.Medium)
+                    LabelValue("${r.category.emoji} ${r.merchant}", "${money(r.monthlyCents, currency)} a month", labelWeight = FontWeight.Medium)
                     Text(
-                        "${CostEstimate.everyLabel(r.everyDays)} · usually ${money(r.typicalCents, c.currency)} · next around ${formatDate(r.nextDate)}",
+                        "${CostEstimate.everyLabel(r.everyDays)} · usually ${money(r.typicalCents, currency)} · next around ${formatDate(r.nextDate)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    PriceChangeTag(r, c.currency)
+                    PriceChangeTag(r, currency)
                 }
             }
         }
