@@ -44,6 +44,10 @@ interface ReceiptDao {
     @Query("SELECT * FROM line_items WHERE receiptId = :receiptId ORDER BY position")
     suspend fun getItems(receiptId: Long): List<LineItem>
 
+    /** Items of receipts that aren't in the trash, kept up to date. */
+    @Query("SELECT line_items.* FROM line_items JOIN receipts ON receipts.id = line_items.receiptId WHERE receipts.deletedAt IS NULL")
+    fun observeAllItems(): Flow<List<LineItem>>
+
     /** Items of receipts that aren't in the trash. */
     @Query("SELECT line_items.* FROM line_items JOIN receipts ON receipts.id = line_items.receiptId WHERE receipts.deletedAt IS NULL")
     suspend fun getAllItems(): List<LineItem>

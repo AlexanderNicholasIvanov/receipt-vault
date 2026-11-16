@@ -19,10 +19,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.alexivanov.receiptvault.capture.QuickAction
+import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.PageUris
 import com.alexivanov.receiptvault.ui.budgets.BudgetScreen
 import com.alexivanov.receiptvault.ui.detail.DetailScreen
 import com.alexivanov.receiptvault.ui.home.HomeScreen
+import com.alexivanov.receiptvault.ui.insights.CategoryScreen
 import com.alexivanov.receiptvault.ui.insights.InsightsScreen
 import com.alexivanov.receiptvault.ui.lock.LocalAppLocked
 import com.alexivanov.receiptvault.ui.review.CaptureSource
@@ -39,6 +41,7 @@ private object Routes {
     const val REVIEW = "review?uri={uri}&source={source}&id={id}"
     const val DETAIL = "receipt/{id}"
     const val INSIGHTS = "insights"
+    const val CATEGORY = "insights/category/{name}"
     const val SETTINGS = "settings"
     const val TRASH = "trash"
     const val BUDGETS = "budgets"
@@ -47,6 +50,10 @@ private object Routes {
         "review?uri=${Uri.encode(PageUris.encode(uris.map(Uri::toString)))}&source=${source.name}&id=${id ?: ""}"
 
     fun detail(id: Long) = "receipt/$id"
+
+    /** A category's breakdown; null for everything. */
+    fun category(category: Category?) = "insights/category/${category?.name ?: ALL}"
+    const val ALL = "ALL"
 }
 
 /**
@@ -125,7 +132,19 @@ fun AppNav(
             val id = entry.arguments?.getLong("id") ?: return@composable
             DetailScreen(id = id, onBack = { entry.ifResumed { nav.popBackStack() } }, onEdit = { entry.ifResumed { nav.navigate(Routes.review(id = it)) } })
         }
-        composable(Routes.INSIGHTS) { entry -> InsightsScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }
+        composable(Routes.INSIGHTS) { entry ->
+            InsightsScreen(
+                onBack = { entry.ifResumed { nav.popBackStack() } },
+                onCategory = { entry.ifResumed { nav.navigate(Routes.category(it)) } },
+            )
+        }
+        composable(Routes.CATEGORY, arguments = listOf(navArgument("name") { type = NavType.StringType })) { entry ->
+            val name = entry.arguments?.getString("name") ?: Routes.ALL
+            CategoryScreen(
+                category = Category.entries.firstOrNull { it.name == name },
+                onBack = { entry.ifResumed { nav.popBackStack() } },
+            )
+        }
         composable(Routes.SETTINGS) { entry ->
             SettingsScreen(onBack = { entry.ifResumed { nav.popBackStack() } }, onTrash = { entry.ifResumed { nav.navigate(Routes.TRASH) } }, onBudgets = { entry.ifResumed { nav.navigate(Routes.BUDGETS) } })
         }
