@@ -39,39 +39,39 @@ class NavigationTest {
 
     @Test
     fun `a double tap on Back leaves one screen, not two`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
         compose.onNodeWithContentDescription("Settings").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
 
         // Both taps land before the screen has gone.
         val back = compose.onNodeWithContentDescription("Back").fetchSemanticsNode()
         compose.runOnUiThread { repeat(2) { back.config[SemanticsActions.OnClick].action!!.invoke() } }
 
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
     }
 
     @Test
     fun `filter choices not yet applied survive turning the phone`() {
         addReceipt()
-        compose.waitUntilAtLeastOneExists(hasText("Filters"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Filters"), UI_WAIT)
         compose.onNodeWithText("Filters").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Oldest first"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Oldest first"), UI_WAIT)
         compose.onNodeWithText("Oldest first").performClick()
 
         compose.activityRule.scenario.recreate()
 
-        compose.waitUntilAtLeastOneExists(hasText("Oldest first"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Oldest first"), UI_WAIT)
         compose.onNodeWithText("Oldest first").assertIsSelected()
     }
 
     @Test
     fun `search finds a receipt by an item typed in by hand`() {
         addReceipt()
-        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), UI_WAIT)
         val box = compose.onNode(hasSetTextAction())
         box.performTextInput("oat milk")
-        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), UI_WAIT)
         box.performTextReplacement("stapler")
-        compose.waitUntilDoesNotExist(hasText("Corner Store"), 5_000)
+        compose.waitUntilDoesNotExist(hasText("Corner Store"), UI_WAIT)
     }
 }

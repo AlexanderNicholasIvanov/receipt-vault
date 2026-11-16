@@ -31,23 +31,23 @@ class BackupInBackgroundTest {
 
     @Test
     fun `a restore keeps going after leaving Settings and still reports how it went`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
         compose.onNodeWithContentDescription("Settings").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
 
         val finish = CompletableDeferred<Unit>()
         assertTrue(app.backupTasks.run { finish.await(); "Restored 2 receipts." })
-        compose.waitUntil(5_000) { app.backupTasks.busy.value }
+        compose.waitUntil(UI_WAIT) { app.backupTasks.busy.value }
 
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 5_000)
-        compose.waitUntilDoesNotExist(hasText("Restore from backup"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
+        compose.waitUntilDoesNotExist(hasText("Restore from backup"), UI_WAIT)
         assertTrue("still running", app.backupTasks.busy.value)
 
         finish.complete(Unit)
-        compose.waitUntil(5_000) { !app.backupTasks.busy.value }
+        compose.waitUntil(UI_WAIT) { !app.backupTasks.busy.value }
         // The toast is posted to the main thread, which only node lookups run on their own.
-        compose.waitUntil(5_000) {
+        compose.waitUntil(UI_WAIT) {
             shadowOf(Looper.getMainLooper()).idle()
             ShadowToast.getTextOfLatestToast() == "Restored 2 receipts."
         }
@@ -57,12 +57,12 @@ class BackupInBackgroundTest {
 
     @Test
     fun `with Settings open, the outcome shows there`() {
-        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
         compose.onNodeWithContentDescription("Settings").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
 
         app.backupTasks.run { "Backed up 4 receipts." }
-        compose.waitUntilAtLeastOneExists(hasText("Backed up 4 receipts."), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("Backed up 4 receipts."), UI_WAIT)
         assertEquals(null, ShadowToast.getTextOfLatestToast())
     }
 }

@@ -43,28 +43,28 @@ class TwoPaneTest {
         compose.onNode(hasStateDescription(OPEN)).assertDoesNotExist()
         addReceipt("Corner Store", 899, "Oat Milk")
         addReceipt("Bakery", 450, "Sourdough")
-        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), UI_WAIT)
 
         compose.onNodeWithText("Corner Store").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Oat Milk"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Oat Milk"), UI_WAIT)
         // The list is still there beside it, with the open receipt marked.
         compose.onNodeWithText("Bakery").assertExists()
         compose.onNode(hasStateDescription(OPEN)).assert(hasText("Corner Store", substring = true))
 
         // Another receipt replaces it in the same pane.
         compose.onNodeWithText("Bakery").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Sourdough"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Sourdough"), UI_WAIT)
         compose.onNodeWithText("Oat Milk").assertDoesNotExist()
-        compose.waitUntilExactlyOneExists(hasStateDescription(OPEN), 10_000)
+        compose.waitUntilExactlyOneExists(hasStateDescription(OPEN), UI_WAIT)
         compose.onNode(hasStateDescription(OPEN)).assert(hasText("Bakery", substring = true))
 
         // Folded to a phone-sized screen, the open receipt fills it.
         RuntimeEnvironment.setQualifiers("w411dp-h900dp")
         compose.activityRule.scenario.recreate()
-        compose.waitUntilAtLeastOneExists(hasText("Sourdough"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Sourdough"), UI_WAIT)
         compose.onNodeWithText("Corner Store").assertDoesNotExist()
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), 10_000)
+        compose.waitUntilAtLeastOneExists(hasText("Corner Store"), UI_WAIT)
         // One pane again: nothing is marked open.
         compose.onNode(hasStateDescription(OPEN)).assertDoesNotExist()
     }

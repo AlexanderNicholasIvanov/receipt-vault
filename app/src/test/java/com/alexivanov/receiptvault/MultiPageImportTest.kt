@@ -49,7 +49,7 @@ class MultiPageImportTest {
             .putParcelableArrayListExtra(Intent.EXTRA_STREAM, pages)
 
         ActivityScenario.launch<MainActivity>(intent).use {
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 20_000)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
 
             // The page copies are gone; only the joined photo is kept for the receipt.
             val stored = File(context.filesDir, "receipts").listFiles().orEmpty().filter { it.extension == "jpg" }

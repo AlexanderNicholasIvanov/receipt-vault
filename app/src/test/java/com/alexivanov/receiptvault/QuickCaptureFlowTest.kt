@@ -33,11 +33,11 @@ class QuickCaptureFlowTest {
     @Test
     fun `the Add manually shortcut opens an empty receipt`() {
         ActivityScenario.launch<MainActivity>(QuickCapture.intent(context, QuickAction.MANUAL)).use {
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
             compose.onNodeWithText("Merchant").performTextInput("Kiosk")
             compose.onNodeWithText("Total").performTextInput("3.50")
             compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
-            compose.waitUntilAtLeastOneExists(hasText("$3.50"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("$3.50"), UI_WAIT)
         }
     }
 
@@ -45,24 +45,24 @@ class QuickCaptureFlowTest {
     fun `Back on an unsaved receipt asks first, Back on an untouched one just leaves`() {
         ActivityScenario.launch<MainActivity>(QuickCapture.intent(context, QuickAction.MANUAL)).use { scenario ->
             fun pressBack() = scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
             compose.onNodeWithText("Merchant").performTextInput("Half typed")
             compose.waitForIdle()
 
             pressBack()
-            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), UI_WAIT)
             compose.onNodeWithText("Keep editing").performClick()
             compose.onNodeWithText("Half typed").assertExists()
 
             pressBack()
-            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), UI_WAIT)
             compose.onNodeWithText("Discard").performClick()
             compose.waitForEmptyHome()
 
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
             pressBack()
             compose.waitForEmptyHome()
             compose.onNodeWithText("Discard this receipt?").assertDoesNotExist()
@@ -73,7 +73,7 @@ class QuickCaptureFlowTest {
     fun `the Scan shortcut starts the scanner from Home`() {
         ActivityScenario.launch<MainActivity>(QuickCapture.intent(context, QuickAction.SCAN)).use {
             // No Google Play services here, so the scanner falls back to the camera, which says so.
-            compose.waitUntilAtLeastOneExists(hasText("Document scanner unavailable", substring = true), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Document scanner unavailable", substring = true), UI_WAIT)
         }
     }
 
@@ -82,25 +82,25 @@ class QuickCaptureFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.waitForEmptyHome()
             compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), 5_000)
+            compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
             compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
             compose.onNodeWithText("Merchant").performTextInput("Half typed")
             compose.waitForIdle()
 
             fun tapShortcut() = scenario.onActivity { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, QuickCapture.intent(context, QuickAction.MANUAL)) }
 
             tapShortcut()
-            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), UI_WAIT)
             compose.onNodeWithText("Keep editing").performClick()
-            compose.waitUntilDoesNotExist(hasText("Discard this receipt?"), 5_000)
+            compose.waitUntilDoesNotExist(hasText("Discard this receipt?"), UI_WAIT)
             compose.onNodeWithText("Half typed").assertExists()
 
             tapShortcut()
-            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), 10_000)
+            compose.waitUntilAtLeastOneExists(hasText("Discard this receipt?"), UI_WAIT)
             compose.onNodeWithText("Discard").performClick()
-            compose.waitUntilDoesNotExist(hasText("Half typed"), 10_000)
-            compose.waitUntilAtLeastOneExists(hasText("Merchant"), 10_000)
+            compose.waitUntilDoesNotExist(hasText("Half typed"), UI_WAIT)
+            compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
         }
     }
 }
