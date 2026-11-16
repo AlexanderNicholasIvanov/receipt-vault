@@ -80,6 +80,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
         }
+        // The release build without R8, only for recording the baseline profile: a profile needs the
+        // real class names, and the release build's R8 run then maps them to the shrunk ones.
+        create("profile") {
+            initWith(getByName("benchmark"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
     }
 
     buildFeatures {

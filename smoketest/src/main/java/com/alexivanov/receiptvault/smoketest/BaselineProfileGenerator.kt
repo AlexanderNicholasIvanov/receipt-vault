@@ -4,6 +4,7 @@ import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -13,8 +14,10 @@ import org.junit.runner.RunWith
  * app/src/main/baseline-prof.txt, they are compiled ahead of time on install instead of being
  * interpreted at first, so the app starts and scrolls faster from the first run.
  *
- * CI runs this on every build and keeps the result with the test outputs
- * (BaselineProfileGenerator_generate-baseline-prof.txt); copy it over the app's file to update it.
+ * Runs against the app's un-minified "profile" build, since a profile needs real class names:
+ * `./gradlew :smoketest:connectedProfileAndroidTest`. CI does this on every build and keeps the
+ * result with the test outputs (BaselineProfileGenerator_generate-baseline-prof.txt); copy it over
+ * the app's file to update it.
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {
@@ -23,7 +26,12 @@ class BaselineProfileGenerator {
     val rule = BaselineProfileRule()
 
     @Test
-    fun generate() = rule.collect(packageName = SmokeTest.PACKAGE) {
+    fun generate() {
+        assumeTrue("Only against the un-minified profile build", BuildConfig.RECORDS_PROFILE)
+        record()
+    }
+
+    private fun record() = rule.collect(packageName = SmokeTest.PACKAGE) {
         pressHome()
         startActivityAndWait()
         device.wait(Until.hasObject(By.text("Receipts")), SmokeTest.TIMEOUT)

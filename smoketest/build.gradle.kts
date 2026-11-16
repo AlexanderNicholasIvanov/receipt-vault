@@ -23,7 +23,19 @@ android {
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
+            buildConfigField("boolean", "RECORDS_PROFILE", "false")
         }
+        // Against the app's un-minified "profile" build: only BaselineProfileGenerator runs here.
+        create("profile") {
+            isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("benchmark", "release")
+            buildConfigField("boolean", "RECORDS_PROFILE", "true")
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     targetProjectPath = ":app"
@@ -38,7 +50,7 @@ android {
 
 androidComponents {
     // Only the minified build is worth testing here; the debug build has the unit tests.
-    beforeVariants(selector().all()) { it.enable = it.buildType == "benchmark" }
+    beforeVariants(selector().all()) { it.enable = it.buildType == "benchmark" || it.buildType == "profile" }
 }
 
 dependencies {

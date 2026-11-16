@@ -8,6 +8,8 @@ import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
+import org.junit.Assume.assumeFalse
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,6 +24,10 @@ class StartupBenchmark {
 
     @get:Rule
     val rule = MacrobenchmarkRule()
+
+    /** Start-up is measured on the minified build users get, not the profile-recording one. */
+    @Before
+    fun minifiedOnly() = assumeFalse(BuildConfig.RECORDS_PROFILE)
 
     @Test
     fun coldStartWithoutProfile() = start(CompilationMode.None())
