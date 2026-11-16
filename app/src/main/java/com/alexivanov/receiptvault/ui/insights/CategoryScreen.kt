@@ -40,6 +40,8 @@ import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.CategoryBreakdown
 import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.SpendingBreakdown
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -183,7 +185,7 @@ fun CategoryScreen(category: Category?, onBack: () -> Unit, onItem: (String) -> 
 
 @Composable
 private fun Overview(b: CategoryBreakdown) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${money(b.monthlyCents, b.currency)} a month", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(
@@ -191,13 +193,13 @@ private fun Overview(b: CategoryBreakdown) {
                     (if (b.receipts == 1) "1 receipt" else "${b.receipts} receipts") +
                     (b.since?.let { " since ${formatDate(it)}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = heroMuted(),
             )
             if (b.otherCurrencyCount > 0) {
                 Text(
                     "${b.otherCurrencyCount} ${if (b.otherCurrencyCount == 1) "receipt" else "receipts"} in other currencies not included.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
         }
@@ -212,7 +214,7 @@ private fun Overview(b: CategoryBreakdown) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { (label, value) ->
                         Column(Modifier.weight(1f)) {
-                            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(label, style = MaterialTheme.typography.labelMedium, color = heroMuted())
                             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -221,7 +223,7 @@ private fun Overview(b: CategoryBreakdown) {
             Text(
                 "Per receipt · ${money(b.totalCents, b.currency)} in all",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = heroMuted(),
             )
         }
     }

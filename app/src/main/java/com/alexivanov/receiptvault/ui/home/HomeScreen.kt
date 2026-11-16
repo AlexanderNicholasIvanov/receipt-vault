@@ -402,8 +402,8 @@ private fun SummaryCard(s: Summary, budget: BudgetUse?) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Stat("Receipts", s.count.toString())
-                Stat("Tips", money(s.tipCents, s.currency))
-                Stat("Tax", money(s.taxCents, s.currency))
+                if (s.tipCents != 0L) Stat("Tips", money(s.tipCents, s.currency))
+                if (s.taxCents != 0L) Stat("Tax", money(s.taxCents, s.currency))
             }
             if (budget != null) {
                 Spacer(Modifier.height(12.dp))
