@@ -54,7 +54,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -112,8 +111,6 @@ fun HomeScreen(
     onOpen: (Long) -> Unit,
     onCaptured: (List<Uri>, CaptureSource) -> Unit,
     onManual: () -> Unit,
-    onInsights: () -> Unit,
-    onSettings: () -> Unit,
     /** A category's breakdown, from the period details. */
     onCategory: (Category) -> Unit = {},
     /** Start the scanner or camera without a tap on Home: a Scan shortcut, or the next receipt of a pile. */
@@ -233,10 +230,6 @@ fun HomeScreen(
                                 Icon(painterResource(R.drawable.ic_report), contentDescription = "Expense report")
                             }
                         }
-                        IconButton(onClick = onInsights) {
-                            Icon(painterResource(R.drawable.ic_insights), contentDescription = "Insights")
-                        }
-                        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
                     },
                 )
             }

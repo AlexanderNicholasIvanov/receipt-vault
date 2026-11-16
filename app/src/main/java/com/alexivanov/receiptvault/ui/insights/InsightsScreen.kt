@@ -17,13 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -80,7 +78,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onRetirement: () -> Unit = {}) {
+fun InsightsScreen(onCategory: (Category?) -> Unit = {}, onRetirement: () -> Unit = {}) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val all by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = null)
@@ -110,9 +108,6 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
             Column {
                 TopAppBar(
                     title = { Text("Insights") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                    },
                 )
                 InsightsTabs(tab, onTab = { tab = it })
             }

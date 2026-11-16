@@ -37,9 +37,9 @@ class BaselineProfileGenerator {
         device.wait(Until.hasObject(By.text("Receipts")), SmokeTest.TIMEOUT)
 
         // Insights, the heaviest screen, and back.
-        device.findObject(By.desc("Insights"))?.let {
+        device.findObject(By.clickable(true).hasDescendant(By.text("Insights")))?.let {
             it.click()
-            device.wait(Until.hasObject(By.text("Insights")), SmokeTest.TIMEOUT)
+            device.wait(Until.hasObject(By.text("Spending")), SmokeTest.TIMEOUT)
             device.pressBack()
             device.wait(Until.hasObject(By.text("Receipts")), SmokeTest.TIMEOUT)
         }

@@ -13,13 +13,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -70,7 +68,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Unit) {
+fun SettingsScreen(onTrash: () -> Unit, onBudgets: () -> Unit) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -125,12 +123,7 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-            )
+            TopAppBar(title = { Text("Settings") })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->

@@ -82,13 +82,13 @@ class SmokeTest {
         waitFor(label("Receipt"))
         device.pressBack()
 
-        find(By.desc("Insights")).click()
-        waitFor(label("Insights"))
+        find(place("Insights")).click()
+        waitFor(label("Spending"))
         scrollToEnd()
         device.pressBack()
 
-        find(By.desc("Settings")).click()
-        waitFor(label("Settings"))
+        find(place("Settings")).click()
+        waitFor(label("Scanning"))
         scrollToEnd()
         device.pressBack()
 
@@ -136,6 +136,9 @@ class SmokeTest {
      */
     private fun label(text: String): BySelector =
         By.text(Pattern.compile(Pattern.quote(text) + """(\W.*)?""", Pattern.DOTALL))
+
+    /** One of the places in the navigation bar: the tappable item holding the label, not the screen title of the same name. */
+    private fun place(name: String): BySelector = By.clickable(true).hasDescendant(By.text(name))
 
     /** Taps the text field labelled [name] and types into it. */
     private fun type(name: String, text: String) {

@@ -1,5 +1,25 @@
 package com.alexivanov.receiptvault.ui
 
+import com.alexivanov.receiptvault.R
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -135,6 +155,90 @@ fun AppNav(
         openReceipts.collect { id -> nav.navigate(Routes.detail(id)) { launchSingleTop = true } }
     }
 
+    // The three places a person moves between; any other screen is a step into one of them.
+    val route = nav.currentBackStackEntryAsState().value?.destination?.route
+    val current = Destination.entries.firstOrNull { it.route == route }
+    fun go(to: Destination) {
+        if (to == current) return
+        nav.navigate(to.route) {
+            // One copy of each place, and Back from any of them goes to Receipts. Each keeps
+            // where it was (Insights its tab and scroll) for the next visit.
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    // A bar along the bottom on a phone; a rail down the side on a wide screen, where a bar
+    // would stretch its three items across the width.
+    val rail = current != null && twoPane
+    val bar = current != null && !twoPane
+    Row(Modifier.fillMaxSize()) {
+        if (rail) {
+            NavigationRail {
+                Spacer(Modifier.weight(1f))
+                Destination.entries.forEach { d ->
+                    NavigationRailItem(
+                        selected = d == current,
+                        onClick = { go(d) },
+                        icon = { d.Icon() },
+                        label = { Text(d.label) },
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            // The bar or rail pads itself clear of the system's navigation; the screens needn't.
+            val consumed = when {
+                bar -> Modifier.consumeWindowInsets(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
+                rail -> Modifier.consumeWindowInsets(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Start))
+                else -> Modifier
+            }
+            Box(Modifier.weight(1f).then(consumed)) {
+                Screens(nav, twoPane, { open(it) }, { paneReceipt }, { paneReceipt = it }, captureRequests, captureRequestFlow) { reviewHasUnsavedWork = it }
+            }
+            if (bar) {
+                NavigationBar {
+                    Destination.entries.forEach { d ->
+                        NavigationBarItem(
+                            selected = d == current,
+                            onClick = { go(d) },
+                            icon = { d.Icon() },
+                            label = { Text(d.label) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The places in the bar or rail, in order. */
+private enum class Destination(val route: String, val label: String) {
+    RECEIPTS(Routes.HOME, "Receipts"),
+    INSIGHTS(Routes.INSIGHTS, "Insights"),
+    SETTINGS(Routes.SETTINGS, "Settings"),
+    ;
+
+    @Composable
+    fun Icon() = when (this) {
+        RECEIPTS -> Icon(painterResource(R.drawable.ic_receipt), contentDescription = null)
+        INSIGHTS -> Icon(painterResource(R.drawable.ic_insights), contentDescription = null)
+        SETTINGS -> Icon(Icons.Default.Settings, contentDescription = null)
+    }
+}
+
+@Composable
+private fun Screens(
+    nav: NavHostController,
+    twoPane: Boolean,
+    open: (Long) -> Unit,
+    paneReceipt: () -> Long?,
+    setPaneReceipt: (Long?) -> Unit,
+    captureRequests: Channel<CaptureSource>,
+    captureRequestFlow: Flow<CaptureSource>,
+    onUnsavedWork: (Boolean) -> Unit,
+) {
     NavHost(navController = nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) { entry ->
             val home: @Composable (Modifier) -> Unit = { modifier ->
@@ -143,8 +247,6 @@ fun AppNav(
                     // Not guarded: scanner and picker results can arrive before the screen is resumed.
                     onCaptured = { uris, source -> nav.navigate(Routes.review(uris, source)) },
                     onManual = { entry.ifResumed { nav.navigate(Routes.review()) } },
-                    onInsights = { entry.ifResumed { nav.navigate(Routes.INSIGHTS) } },
-                    onSettings = { entry.ifResumed { nav.navigate(Routes.SETTINGS) } },
                     onCategory = { entry.ifResumed { nav.navigate(Routes.category(it)) } },
                     captureRequests = captureRequestFlow,
                     modifier = modifier,
@@ -158,7 +260,7 @@ fun AppNav(
                 home(Modifier.weight(0.42f))
                 VerticalDivider()
                 Surface(Modifier.weight(0.58f).fillMaxSize()) {
-                    val id = paneReceipt
+                    val id = paneReceipt()
                     if (id == null) {
                         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                             Text("Choose a receipt to see it here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -168,7 +270,7 @@ fun AppNav(
                         key(id) {
                             DetailScreen(
                                 id = id,
-                                onBack = { paneReceipt = null },
+                                onBack = { setPaneReceipt(null) },
                                 onEdit = { entry.ifResumed { nav.navigate(Routes.review(id = it)) } },
                             )
                         }
@@ -186,7 +288,7 @@ fun AppNav(
         ) { entry ->
             ReviewScreen(
                 onBack = { entry.ifResumed { nav.popBackStack() } },
-                onUnsavedWork = { reviewHasUnsavedWork = it },
+                onUnsavedWork = onUnsavedWork,
                 // Saved, and on to the next receipt of a pile: back to Home, which starts the same kind of capture.
                 onNext = { source ->
                     nav.popBackStack(Routes.HOME, inclusive = false)
@@ -205,7 +307,6 @@ fun AppNav(
         }
         composable(Routes.INSIGHTS) { entry ->
             InsightsScreen(
-                onBack = { entry.ifResumed { nav.popBackStack() } },
                 onCategory = { entry.ifResumed { nav.navigate(Routes.category(it)) } },
                 onRetirement = { entry.ifResumed { nav.navigate(Routes.RETIREMENT) } },
             )
@@ -223,7 +324,7 @@ fun AppNav(
             ItemHistoryScreen(itemKey = entry.arguments?.getString("key").orEmpty(), onBack = { entry.ifResumed { nav.popBackStack() } })
         }
         composable(Routes.SETTINGS) { entry ->
-            SettingsScreen(onBack = { entry.ifResumed { nav.popBackStack() } }, onTrash = { entry.ifResumed { nav.navigate(Routes.TRASH) } }, onBudgets = { entry.ifResumed { nav.navigate(Routes.BUDGETS) } })
+            SettingsScreen(onTrash = { entry.ifResumed { nav.navigate(Routes.TRASH) } }, onBudgets = { entry.ifResumed { nav.navigate(Routes.BUDGETS) } })
         }
         composable(Routes.BUDGETS) { entry -> BudgetScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }
         composable(Routes.TRASH) { entry -> TrashScreen(onBack = { entry.ifResumed { nav.popBackStack() } }) }

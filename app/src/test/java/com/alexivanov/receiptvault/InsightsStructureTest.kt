@@ -63,7 +63,7 @@ class InsightsStructureTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Kroger"), UI_WAIT)
         compose.onNodeWithText("Average receipt").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("A month, by category"), UI_WAIT)
         compose.onNodeWithText("Average receipt").assertDoesNotExist()
         compose.onNodeWithText("Top merchants").assertDoesNotExist()
@@ -72,7 +72,7 @@ class InsightsStructureTest {
     @Test
     fun `bills and regular shopping are listed apart, and only bills come due`() {
         billsAndShopping()
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("Bills"), UI_WAIT)
         compose.onNodeWithText("Bills").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Due in the next 7 days"), UI_WAIT)
@@ -92,7 +92,7 @@ class InsightsStructureTest {
         save(today.minusDays(200), "Corner Store", "GROCERIES", 1_200, items = before)
         save(today.minusDays(2), "Corner Store", "GROCERIES", 1_320, items = before.map { (n, p) -> n to p * 11 / 10 })
         compose.waitUntilAtLeastOneExists(hasText("Corner Store"), UI_WAIT)
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("Your inflation"), UI_WAIT)
         compose.onNodeWithText("% a year", substring = true).assertExists()
         // It opens the Future tab, where the rate can go into the retirement estimate.
@@ -104,7 +104,7 @@ class InsightsStructureTest {
     @Config(qualifiers = "w900dp-h700dp")
     fun `on a wide screen the dashboard is two columns`() {
         billsAndShopping()
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("Recurring"), UI_WAIT)
         val hero = compose.onNodeWithText("You spend about").getUnclippedBoundsInRoot()
         val tile = compose.onNodeWithText("Recurring").getUnclippedBoundsInRoot()

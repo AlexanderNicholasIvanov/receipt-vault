@@ -104,7 +104,7 @@ class AppSmokeTest {
         compose.waitUntilDoesNotExist(hasText("Corner Cafe"), UI_WAIT)
 
         // The trash lists it and can put it back.
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.goTo("Settings")
         compose.waitUntilAtLeastOneExists(hasText("1 deleted receipt."), UI_WAIT)
         compose.onNodeWithText("Trash", useUnmergedTree = true).performScrollTo().performClick()
         compose.waitUntilAtLeastOneExists(hasText("Corner Cafe"), UI_WAIT)
@@ -181,7 +181,7 @@ class AppSmokeTest {
     @Test
     fun `reminders and budgets`() {
         compose.waitForEmptyHome()
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.goTo("Settings")
         compose.waitUntilAtLeastOneExists(hasText("Monthly budgets"), UI_WAIT)
         compose.onNodeWithText("Monthly budgets").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Save budgets"), UI_WAIT)
@@ -256,7 +256,7 @@ class AppSmokeTest {
             compose.waitUntilAtLeastOneExists(hasText("Paris Bistro"), UI_WAIT)
             compose.waitUntilAtLeastOneExists(hasText("in other currencies not included", substring = true), UI_WAIT)
 
-            compose.onNodeWithContentDescription("Settings").performClick()
+            compose.goTo("Settings")
             compose.waitUntilAtLeastOneExists(hasText("Convert other currencies"), UI_WAIT)
             compose.onNodeWithText("frankfurter.dev", substring = true).assertExists()
             runBlocking { app.settings.setConvertCurrencies(true) }
@@ -291,7 +291,7 @@ class AppSmokeTest {
         }
         compose.waitUntilAtLeastOneExists(hasText("Netflix"), UI_WAIT)
 
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("You spend about"), UI_WAIT)
         compose.onNodeWithText("3 receipts since", substring = true).assertExists()
         // The current month is labelled as unfinished, for TalkBack too.
@@ -336,7 +336,7 @@ class AppSmokeTest {
         }
         compose.waitUntilAtLeastOneExists(hasText("Kroger"), UI_WAIT)
 
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("You spend about"), UI_WAIT)
         compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("A month, by category"))
         compose.onAllNodesWithText("🛒 Groceries")[0].performClick()
@@ -374,7 +374,7 @@ class AppSmokeTest {
             }
             compose.waitUntilAtLeastOneExists(hasText("Kroger"), UI_WAIT)
 
-            compose.onNodeWithContentDescription("Insights").performClick()
+            compose.goTo("Insights")
             compose.waitUntilAtLeastOneExists(hasText("Future"), UI_WAIT)
             compose.onNodeWithText("Future").performClick()
             compose.waitUntilAtLeastOneExists(hasText("Retirement"), UI_WAIT)
@@ -481,7 +481,7 @@ class AppSmokeTest {
     fun `insights and settings screens open`() {
         compose.waitForEmptyHome()
 
-        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.goTo("Insights")
         compose.waitUntilAtLeastOneExists(hasText("Monthly spending"), UI_WAIT)
         compose.onNodeWithText("Bills").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Nothing repeats regularly yet", substring = true), UI_WAIT)
@@ -490,7 +490,7 @@ class AppSmokeTest {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.goTo("Settings")
         compose.waitUntilAtLeastOneExists(hasText("Export to CSV"), UI_WAIT)
         compose.onNodeWithText("Day-first dates").assertExists()
         compose.onNodeWithText("App lock").assertExists()
