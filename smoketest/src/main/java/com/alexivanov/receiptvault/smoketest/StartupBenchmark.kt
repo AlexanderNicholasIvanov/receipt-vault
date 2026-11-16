@@ -33,7 +33,7 @@ class StartupBenchmark {
     fun coldStartWithoutProfile() = start(CompilationMode.None())
 
     @Test
-    fun coldStartWithProfile() = start(CompilationMode.Partial(BaselineProfileMode.UseIfAvailable))
+    fun coldStartWithProfile() = start(CompilationMode.Partial(BaselineProfileMode.Require))
 
     private fun start(mode: CompilationMode) = rule.measureRepeated(
         packageName = SmokeTest.PACKAGE,
