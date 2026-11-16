@@ -4,8 +4,6 @@ import android.os.Looper
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
@@ -32,14 +30,14 @@ class BackupInBackgroundTest {
     @Test
     fun `a restore keeps going after leaving Settings and still reports how it went`() {
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.goTo("Settings")
         compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
 
         val finish = CompletableDeferred<Unit>()
         assertTrue(app.backupTasks.run { finish.await(); "Restored 2 receipts." })
         compose.waitUntil(UI_WAIT) { app.backupTasks.busy.value }
 
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.goTo("Receipts")
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
         compose.waitUntilDoesNotExist(hasText("Restore from backup"), UI_WAIT)
         assertTrue("still running", app.backupTasks.busy.value)
@@ -58,7 +56,7 @@ class BackupInBackgroundTest {
     @Test
     fun `with Settings open, the outcome shows there`() {
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.goTo("Settings")
         compose.waitUntilAtLeastOneExists(hasText("Restore from backup"), UI_WAIT)
 
         app.backupTasks.run { "Backed up 4 receipts." }

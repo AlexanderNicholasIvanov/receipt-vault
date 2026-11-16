@@ -54,7 +54,7 @@ object SpendingAlerts {
         zone: ZoneId = ZoneId.systemDefault(),
     ): List<SpendingAlert> {
         val costs = CostEstimate.monthly(receipts, fallbackCurrency, today, rates, zone)
-        val bills = costs.recurring.filter { CostEstimate.isCalendarCycle(it.everyDays) }
+        val bills = costs.bills
         val fresh = today.minusDays(FRESH_DAYS)
         val alerts = mutableListOf<SpendingAlert>()
 

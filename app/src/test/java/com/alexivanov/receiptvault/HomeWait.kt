@@ -3,6 +3,8 @@ package com.alexivanov.receiptvault
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
@@ -31,3 +33,6 @@ fun ComposeTestRule.waitForEmptyHome(timeoutMillis: Long = UI_WAIT) {
         throw e
     }
 }
+
+/** Opens one of the places in the navigation bar or rail: "Receipts", "Insights" or "Settings". */
+fun ComposeTestRule.goTo(place: String) = onNode(hasText(place) and isSelectable()).performClick()

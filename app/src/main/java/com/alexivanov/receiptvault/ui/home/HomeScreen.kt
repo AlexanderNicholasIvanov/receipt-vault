@@ -1,5 +1,8 @@
 package com.alexivanov.receiptvault.ui.home
 
+import com.alexivanov.receiptvault.ui.insights.PeriodDetails
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material.icons.filled.MoreVert
@@ -18,6 +21,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.drawBehind
@@ -52,7 +57,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -73,11 +77,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -112,8 +114,8 @@ fun HomeScreen(
     onOpen: (Long) -> Unit,
     onCaptured: (List<Uri>, CaptureSource) -> Unit,
     onManual: () -> Unit,
-    onInsights: () -> Unit,
-    onSettings: () -> Unit,
+    /** A category's breakdown, from the period details. */
+    onCategory: (Category) -> Unit = {},
     /** Start the scanner or camera without a tap on Home: a Scan shortcut, or the next receipt of a pile. */
     captureRequests: Flow<CaptureSource> = emptyFlow(),
     /** On a wide screen, the receipt open beside the list; its row is marked. */
@@ -128,6 +130,7 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var showSheet by remember { mutableStateOf(false) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     fun makeReport() {
@@ -232,10 +235,6 @@ fun HomeScreen(
                                 Icon(painterResource(R.drawable.ic_report), contentDescription = "Expense report")
                             }
                         }
-                        IconButton(onClick = onInsights) {
-                            Icon(painterResource(R.drawable.ic_insights), contentDescription = "Insights")
-                        }
-                        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
                     },
                 )
             }
@@ -297,7 +296,7 @@ fun HomeScreen(
                     }
                 }
             }
-            ui.summary?.let { s -> item { SummaryCard(s, ui.budget) } }
+            ui.summary?.let { s -> item { SummaryCard(s, ui.budget, onDetails = { showDetails = true }) } }
             if (ui.hasAny) {
                 item {
                     OutlinedTextField(
@@ -353,6 +352,20 @@ fun HomeScreen(
         )
     }
 
+    // Totals for the period and filters chosen above the list.
+    val details = ui.summary
+    if (showDetails && details != null && !LocalAppLocked.current) {
+        ModalBottomSheet(onDismissRequest = { showDetails = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+                Text(
+                    if (ui.filter.hasDates) "These dates" else ui.period.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 12.dp),
+                )
+                PeriodDetails(details, onCategory = { showDetails = false; onCategory(it) })
+            }
+        }
+    }
     if (showSheet && !LocalAppLocked.current) {
         // Fully open, and scrollable: half open on a small phone, the last options are out of sight.
         ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -392,13 +405,23 @@ private fun SheetOption(icon: androidx.compose.ui.graphics.painter.Painter, titl
 }
 
 @Composable
-private fun SummaryCard(s: Summary, budget: BudgetUse?) {
+private fun SummaryCard(s: Summary, budget: BudgetUse?, onDetails: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        onClick = onDetails,
+        modifier = Modifier.fillMaxWidth().padding(16.dp).semantics { onClick(label = "See the details") { onDetails(); true } },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(Modifier.padding(20.dp)) {
-            Text("Spent", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Spent", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("Details", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             Text(
                 money(s.totalCents, s.currency),
                 style = MaterialTheme.typography.displaySmall,
@@ -408,8 +431,8 @@ private fun SummaryCard(s: Summary, budget: BudgetUse?) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Stat("Receipts", s.count.toString())
-                Stat("Tips", money(s.tipCents, s.currency))
-                Stat("Tax", money(s.taxCents, s.currency))
+                if (s.tipCents != 0L) Stat("Tips", money(s.tipCents, s.currency))
+                if (s.taxCents != 0L) Stat("Tax", money(s.taxCents, s.currency))
             }
             if (budget != null) {
                 Spacer(Modifier.height(12.dp))

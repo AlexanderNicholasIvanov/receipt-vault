@@ -2,6 +2,7 @@ package com.alexivanov.receiptvault.domain
 
 import com.alexivanov.receiptvault.data.Receipt
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -83,6 +84,65 @@ class MonthlyCostsTest {
         assertEquals(LocalDate.of(2026, 11, 3), r.lastDate)
         // A monthly bill keeps its day of the month, whatever the month's length.
         assertEquals(LocalDate.of(2026, 12, 3), r.nextDate)
+    }
+
+    /** A monthly bill on the 3rd, oldest first, one payment per amount, the last on Nov 3. */
+    private fun monthly(vararg cents: Long, merchant: String = "Netflix") =
+        cents.mapIndexed { i, c -> receipt(LocalDate.of(2026, 11, 3).minusMonths((cents.size - 1 - i).toLong()), c, merchant, Category.ENTERTAINMENT) }
+
+    @Test
+    fun `after a price rise a subscription costs its new price, not the median of old and new`() {
+        // Four months at $15.99, then three at $17.99: the median of all seven is still $15.99.
+        val r = costs(monthly(1_599, 1_599, 1_599, 1_599, 1_799, 1_799, 1_799)).recurring.single()
+        assertEquals(1_799, r.typicalCents)
+        assertEquals(1_799, r.monthlyCents)
+        assertEquals(PriceChange(fromCents = 1_599, toCents = 1_799, since = LocalDate.of(2026, 9, 3), paymentsSince = 3), r.priceChange)
+        assertTrue(r.priceChange!!.up)
+        assertTrue(r.priceChange!!.recent)
+        // The alert looks at the last two payments only: same price, no news.
+        assertFalse(r.priceUp)
+
+        // A fourth bill at the new price: still the price, no longer news.
+        val later = costs(monthly(1_599, 1_599, 1_599, 1_799, 1_799, 1_799, 1_799)).recurring.single()
+        assertEquals(1_799, later.typicalCents)
+        assertFalse(later.priceChange!!.recent)
+    }
+
+    @Test
+    fun `the first bill at a new price counts at once, up or down`() {
+        val up = costs(monthly(1_099, 1_099, 1_099, 1_299)).recurring.single()
+        assertEquals(1_299, up.typicalCents)
+        assertTrue(up.priceUp)
+        val down = costs(monthly(2_000, 2_000, 2_000, 1_500)).recurring.single()
+        assertEquals(1_500, down.typicalCents)
+        assertFalse(down.priceChange!!.up)
+        assertFalse(down.priceUp)
+    }
+
+    @Test
+    fun `a one-off charge, a bill that varies, and a weekly shop have no price change`() {
+        // An extra charge one month, then the usual price again.
+        val oneOff = costs(monthly(1_599, 1_599, 1_599, 2_500, 1_599)).recurring.single()
+        assertNull(oneOff.priceChange)
+        assertEquals(1_599, oneOff.typicalCents)
+        // Electricity: different every month, so there is no price to change. The usual amount is the median.
+        val power = costs(monthly(8_000, 9_500, 7_000, 11_000, 8_800, merchant = "City Power")).recurring.single()
+        assertNull(power.priceChange)
+        assertEquals(8_800, power.typicalCents)
+        // Weekly shopping is never a price change, however it moves.
+        val shop = (0..5).map { w -> receipt(today.minusWeeks(5L - w), if (w >= 3) 9_000 else 6_000, "Kroger", Category.GROCERIES) }
+        assertNull(costs(shop).recurring.single().priceChange)
+    }
+
+    @Test
+    fun `monthly payments are bills, and weekly ones regular shopping`() {
+        val receipts = monthly(1_599, 1_599, 1_599) +
+            monthly(8_000, 9_100, 8_500, merchant = "City Power") +
+            (0..5).map { w -> receipt(today.minusWeeks(w.toLong()), 5_000, "Kroger", Category.GROCERIES) }
+        val c = costs(receipts)
+        assertEquals(listOf("City Power", "Netflix"), c.bills.map { it.merchant })
+        assertEquals(listOf("Kroger"), c.regularShopping.map { it.merchant })
+        assertEquals(c.recurring.size, c.bills.size + c.regularShopping.size)
     }
 
     @Test

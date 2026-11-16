@@ -35,6 +35,9 @@ import com.alexivanov.receiptvault.domain.Bills
 import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.DueBill
 import com.alexivanov.receiptvault.domain.MonthlyCosts
+import com.alexivanov.receiptvault.domain.RecurringCost
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -42,17 +45,21 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** What's due soon, what's paid this month, and every regular payment found in the receipts. */
+/**
+ * What's due soon and what's paid this month, for subscriptions and bills; then every regular
+ * payment found in the receipts, bills apart from regular shopping like the weekly shop.
+ */
 @Composable
 internal fun BillsTab(costs: MonthlyCosts, today: LocalDate, modifier: Modifier = Modifier) {
-    val upcoming = remember(costs.recurring, today) { Bills.upcoming(costs.recurring, today) }
-    val month = remember(costs.recurring, today) { Bills.thisMonth(costs.recurring, today) }
+    val bills = costs.bills
+    val upcoming = remember(bills, today) { Bills.upcoming(bills, today) }
+    val month = remember(bills, today) { Bills.thisMonth(bills, today) }
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (costs.recurring.isNotEmpty()) {
+        if (bills.isNotEmpty()) {
             item { DueSoonCard(upcoming, costs.currency, today) }
             if (month.due > 0) {
                 item {
@@ -79,8 +86,29 @@ internal fun BillsTab(costs: MonthlyCosts, today: LocalDate, modifier: Modifier 
                 }
             }
         }
-        item { SectionTitle("Recurring costs") }
-        item { RecurringCosts(costs) }
+        if (costs.recurring.isEmpty()) {
+            item { SectionTitle("Recurring costs") }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Text(
+                        "Nothing repeats regularly yet. A place you pay at a steady pace, " +
+                            "${CostEstimate.MIN_PAYMENTS} or more times, shows up here.",
+                        Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (bills.isNotEmpty()) {
+            item { SectionTitle("Subscriptions & bills") }
+            item { RecurringList(bills, costs.currency) }
+        }
+        val shopping = costs.regularShopping
+        if (shopping.isNotEmpty()) {
+            item { SectionTitle("Regular shopping") }
+            item { RecurringList(shopping, costs.currency) }
+        }
     }
 }
 
@@ -95,7 +123,7 @@ internal fun relativeDay(date: LocalDate, today: LocalDate, locale: Locale): Str
 @Composable
 private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) {
     val locale = LocalConfiguration.current.locales[0]
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Due in the next 7 days", style = MaterialTheme.typography.titleMedium)
             Text(money(due.sumOf { it.bill.typicalCents }, currency), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -104,7 +132,7 @@ private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) 
                 Text(
                     "Nothing due this week.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
             due.forEach { d ->
@@ -114,10 +142,11 @@ private fun DueSoonCard(due: List<DueBill>, currency: String, today: LocalDate) 
                         Text(
                             relativeDay(d.date, today, locale),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = heroMuted(),
                         )
+                        PriceChangeTag(d.bill, currency)
                     }
-                    Text("usually ${money(d.bill.typicalCents, currency)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("usually ${money(d.bill.typicalCents, currency)}", color = heroMuted())
                 }
             }
         }
@@ -152,41 +181,43 @@ private fun WeekStrip(due: List<DueBill>, currency: String, today: LocalDate, lo
     }
 }
 
-/** Merchants paid at a steady pace, with their usual amount and when the next one is due. */
+/** "▲ Price up from $15.99 on Sep 19, 2026" while a bill's new price is still news. */
+internal fun priceChangeText(bill: RecurringCost, currency: String): String? {
+    val change = bill.priceChange?.takeIf { it.recent } ?: return null
+    val what = if (change.up) "▲ Price up" else "▼ Price down"
+    return "$what from ${money(change.fromCents, currency)} on ${formatDate(change.since)}"
+}
+
+/** An arrow and words, so the change never depends on color alone. */
 @Composable
-private fun RecurringCosts(c: MonthlyCosts) {
+private fun PriceChangeTag(bill: RecurringCost, currency: String) {
+    val text = priceChangeText(bill, currency) ?: return
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (bill.priceChange?.up == true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+    )
+}
+
+/** Merchants paid at a steady pace, what they come to a month, their usual amount and when the next one is due. */
+@Composable
+private fun RecurringList(list: List<RecurringCost>, currency: String) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (c.recurring.isEmpty()) {
-                Text(
-                    "Nothing repeats regularly yet. A place you pay at a steady pace, " +
-                        "${CostEstimate.MIN_PAYMENTS} or more times, shows up here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    "Recurring: ${money(c.recurringMonthlyCents, c.currency)} a month from ${c.recurring.size} regular " +
-                        if (c.recurring.size == 1) "payment" else "payments",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            c.recurring.forEach { r ->
+            Text(
+                "${money(list.sumOf { it.monthlyCents }, currency)} a month from ${list.size} " +
+                    if (list.size == 1) "place" else "places",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            list.forEach { r ->
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
-                    LabelValue("${r.category.emoji} ${r.merchant}", "${money(r.monthlyCents, c.currency)} a month", labelWeight = FontWeight.Medium)
+                    LabelValue("${r.category.emoji} ${r.merchant}", "${money(r.monthlyCents, currency)} a month", labelWeight = FontWeight.Medium)
                     Text(
-                        "${CostEstimate.everyLabel(r.everyDays)} · usually ${money(r.typicalCents, c.currency)} · next around ${formatDate(r.nextDate)}",
+                        "${CostEstimate.everyLabel(r.everyDays)} · usually ${money(r.typicalCents, currency)} · next around ${formatDate(r.nextDate)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (r.priceUp) {
-                        // An arrow and words, so the change never depends on color alone.
-                        Text(
-                            "▲ Price up: ${money(r.previousCents ?: r.typicalCents, c.currency)} → ${money(r.latestCents, c.currency)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
+                    PriceChangeTag(r, currency)
                 }
             }
         }

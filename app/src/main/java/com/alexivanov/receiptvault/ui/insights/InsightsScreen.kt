@@ -13,19 +13,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -33,22 +32,23 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,37 +61,46 @@ import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.InsightsOverview
 import com.alexivanov.receiptvault.domain.MonthlyCosts
 import com.alexivanov.receiptvault.domain.Period
+import com.alexivanov.receiptvault.domain.PersonalInflation
+import com.alexivanov.receiptvault.domain.PriceHistory
 import com.alexivanov.receiptvault.domain.Retirement
 import com.alexivanov.receiptvault.domain.RetirementEstimate
 import com.alexivanov.receiptvault.domain.RetirementPlan
-import com.alexivanov.receiptvault.domain.Summary
 import com.alexivanov.receiptvault.domain.Trend
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.formatDate
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.roughMoney
-import com.alexivanov.receiptvault.ui.review.SectionTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onRetirement: () -> Unit = {}) {
+fun InsightsScreen(onCategory: (Category?) -> Unit = {}, onRetirement: () -> Unit = {}) {
     val context = LocalContext.current
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val all by app.receipts.receipts.collectAsStateWithLifecycle(initialValue = null)
     val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
-    var period by remember { mutableStateOf(Period.THIS_YEAR) }
+    val items by app.receipts.allItems.collectAsStateWithLifecycle(initialValue = null)
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
     val today = LocalDate.now()
     val rates = settings.activeRates
     // Several milliseconds with thousands of receipts: off the main thread, so scrolling never waits.
-    val overview by produceState<InsightsOverview?>(null, all, period, settings.defaultCurrency, rates) {
+    // Every number here is an average over all receipts; totals for a period live on Home.
+    val overview by produceState<InsightsOverview?>(null, all, settings.defaultCurrency, rates) {
         val receipts = all ?: return@produceState
         value = withContext(Dispatchers.Default) {
-            Insights.overview(receipts, period, settings.defaultCurrency, LocalDate.now(), rates)
+            Insights.overview(receipts, Period.ALL, settings.defaultCurrency, LocalDate.now(), rates)
         }
+    }
+    // Null while loading; inside, null when there isn't enough history yet.
+    val inflation by produceState<Result<PersonalInflation?>?>(null, all, items, settings.defaultCurrency, rates) {
+        val receipts = all ?: return@produceState
+        val lines = items ?: return@produceState
+        value = Result.success(withContext(Dispatchers.Default) { PriceHistory.inflation(receipts, lines, settings.defaultCurrency, LocalDate.now(), rates) })
     }
 
     Scaffold(
@@ -99,15 +108,8 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
             Column {
                 TopAppBar(
                     title = { Text("Insights") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                    },
                 )
-                PrimaryTabRow(selectedTabIndex = tab) {
-                    listOf("Spending", "Bills", "Future").forEachIndexed { i, title ->
-                        Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
-                    }
-                }
+                InsightsTabs(tab, onTab = { tab = it })
             }
         },
     ) { padding ->
@@ -121,21 +123,39 @@ fun InsightsScreen(onBack: () -> Unit, onCategory: (Category?) -> Unit = {}, onR
         val content = Modifier.padding(padding)
         when (tab) {
             1 -> BillsTab(costs, today, content)
-            2 -> FutureTab(costs, estimate, settings.retirement, onRetirement, content)
+            2 -> FutureTab(costs, estimate, settings.retirement, inflation, onRetirement, content)
             else -> SpendingTab(
                 data = data,
                 converted = rates != null,
                 today = today,
                 estimate = estimate,
                 plan = settings.retirement,
-                period = period,
-                onPeriod = { period = it },
+                inflation = inflation,
                 onBills = { tab = 1 },
+                onFuture = { tab = 2 },
                 onCategory = onCategory,
                 onRetirement = onRetirement,
                 modifier = content,
             )
         }
+    }
+}
+
+/**
+ * Spending · Bills · Future. At large text sizes the three no longer fit across a phone, so the
+ * row scrolls instead of breaking a word over two lines.
+ */
+@Composable
+private fun InsightsTabs(selected: Int, onTab: (Int) -> Unit) {
+    val tabs = @Composable {
+        listOf("Spending", "Bills", "Future").forEachIndexed { i, title ->
+            Tab(selected = selected == i, onClick = { onTab(i) }, text = { Text(title) })
+        }
+    }
+    if (isLargeFont()) {
+        PrimaryScrollableTabRow(selectedTabIndex = selected, edgePadding = 0.dp, tabs = tabs)
+    } else {
+        PrimaryTabRow(selectedTabIndex = selected, tabs = tabs)
     }
 }
 
@@ -159,6 +179,9 @@ internal fun LabelValue(label: String, value: String, labelWeight: FontWeight? =
     }
 }
 
+/** From this width the Spending tab sets its cards in two columns instead of one stretched one. */
+private const val TWO_COLUMN_MIN_WIDTH_DP = 840
+
 @Composable
 private fun SpendingTab(
     data: InsightsOverview,
@@ -166,40 +189,49 @@ private fun SpendingTab(
     today: LocalDate,
     estimate: RetirementEstimate,
     plan: RetirementPlan,
-    period: Period,
-    onPeriod: (Period) -> Unit,
+    inflation: Result<PersonalInflation?>?,
     onBills: () -> Unit,
+    onFuture: () -> Unit,
     onCategory: (Category?) -> Unit,
     onRetirement: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val (summary, monthly, costs, trend) = data
+    val hero = @Composable { HeroCard(costs, trend) }
+    val chart = @Composable { MonthlyChartCard(monthly, summary.currency, converted) }
+    val tiles = @Composable { Tiles(costs, today, estimate, plan, inflation, onBills, onFuture, onCategory, onRetirement) }
+    val categories = @Composable { CategoryMonthlyCard(costs, onCategory) }
+    val hasReceipts = costs.receipts > 0
+    if (LocalConfiguration.current.screenWidthDp >= TWO_COLUMN_MIN_WIDTH_DP) {
+        // The answer and its trend on the left; the ways in and the categories on the right.
+        LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(24.dp)) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        hero()
+                        chart()
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (hasReceipts) {
+                            tiles()
+                            categories()
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { HeroCard(costs, trend) }
-        item { MonthlyChartCard(monthly, summary.currency, converted) }
-        if (costs.receipts > 0) {
-            item { Tiles(costs, today, estimate, plan, onBills, onCategory, onRetirement) }
-            item { CategoryMonthlyCard(costs, onCategory) }
-        }
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(Period.entries) { p ->
-                    FilterChip(selected = period == p, onClick = { onPeriod(p) }, label = { Text(p.label) })
-                }
-            }
-        }
-        item { StatsGrid(summary) }
-        if (summary.byCategory.isNotEmpty()) {
-            item { SectionTitle("By category") }
-            item { Breakdown(summary.byCategory.map { (c, v) -> "${c.emoji} ${c.label}" to v }, summary, onClick = { i -> onCategory(summary.byCategory[i].first) }) }
-        }
-        if (summary.topMerchants.isNotEmpty()) {
-            item { SectionTitle("Top merchants") }
-            item { Breakdown(summary.topMerchants, summary) }
+        item { hero() }
+        item { chart() }
+        if (hasReceipts) {
+            item { tiles() }
+            item { categories() }
         }
     }
 }
@@ -210,31 +242,31 @@ private fun SpendingTab(
  */
 @Composable
 private fun HeroCard(c: MonthlyCosts, trend: Trend?) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (c.since == null) {
                 Text("What you spend a month", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Add receipts to see what your expenses come to in an average month.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
                 return@Column
             }
-            Text("You spend about", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("You spend about", style = MaterialTheme.typography.labelLarge, color = heroMuted())
             Text("${roughMoney(c.monthlyCents, c.currency)} a month", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
             trend?.let { TrendTag(it) }
             Text(
                 "About ${roughMoney(c.yearlyCents, c.currency)} a year · " +
                     "${c.receipts} ${if (c.receipts == 1) "receipt" else "receipts"} since ${formatDate(c.since)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = heroMuted(),
             )
             if (c.otherCurrencyCount > 0) {
                 Text(
                     "${c.otherCurrencyCount} ${if (c.otherCurrencyCount == 1) "receipt" else "receipts"} in other currencies not included.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = heroMuted(),
                 )
             }
         }
@@ -260,20 +292,23 @@ private fun TrendTag(t: Trend) {
 
 private class TileData(val label: String, val value: String, val detail: String, val onClick: () -> Unit)
 
-/** Four ways in: the bills, the next payment, retirement and the biggest category. Stacked at large text sizes. */
+/** Four ways in: the bills, the next payment, retirement and your inflation. Stacked at large text sizes. */
 @Composable
 private fun Tiles(
     c: MonthlyCosts,
     today: LocalDate,
     estimate: RetirementEstimate,
     plan: RetirementPlan,
+    inflation: Result<PersonalInflation?>?,
     onBills: () -> Unit,
+    onFuture: () -> Unit,
     onCategory: (Category?) -> Unit,
     onRetirement: () -> Unit,
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    val next = remember(c.recurring, today) { Bills.next(c.recurring, today) }
+    val next = remember(c.recurring, today) { Bills.next(c.bills, today) }
     val top = c.byCategory.firstOrNull()
+    val yours = inflation?.getOrNull()
     val tiles = listOf(
         TileData(
             "Recurring",
@@ -290,15 +325,23 @@ private fun Tiles(
         } else {
             TileData("Next bill", next.bill.merchant, "${relativeDay(next.date, today, locale)} · ${money(next.bill.typicalCents, c.currency)}", onBills)
         },
-        if (estimate.age == null) {
-            TileData("Retirement", "Plan it", "How much you'd need", onRetirement)
-        } else {
-            TileData("Retirement", "About ${roughMoney(estimate.neededCents, c.currency)}", "by age ${plan.retireAge}", onRetirement)
+        when {
+            estimate.age == null -> TileData("Retirement", "Plan it", "How much you'd need", onRetirement)
+            estimate.shortfallCents == 0L -> TileData("Retirement", "On track", "Your savings cover it", onRetirement)
+            estimate.monthlySavingCents > 0 -> TileData(
+                "Retirement",
+                "Save ${roughMoney(estimate.monthlySavingCents, c.currency)} a month",
+                "About ${roughMoney(estimate.neededCents, c.currency)} by ${plan.retireAge}",
+                onRetirement,
+            )
+            else -> TileData("Retirement", "About ${roughMoney(estimate.neededCents, c.currency)}", "by age ${plan.retireAge}", onRetirement)
         },
-        if (top == null) {
-            TileData("What you buy", "Everything", "Items and places", { onCategory(null) })
-        } else {
-            TileData("Top category", "${top.category.emoji} ${top.category.label}", "${roughMoney(top.monthlyCents, c.currency)} a month") { onCategory(top.category) }
+        when {
+            yours != null -> TileData("Your inflation", "${Retirement.percentText(yours.roundedBp)}% a year", "${yours.items} things you rebuy", onFuture)
+            // Not enough repeat purchases yet (or still working it out): the biggest category.
+            top != null ->
+                TileData("Top category", "${top.category.emoji} ${top.category.label}", "${roughMoney(top.monthlyCents, c.currency)} a month") { onCategory(top.category) }
+            else -> TileData("Your inflation", "Not yet", "Needs repeat purchases", onFuture)
         },
     )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -307,7 +350,7 @@ private fun Tiles(
                 row.forEach { t ->
                     Card(onClick = t.onClick, modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(t.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OpensLabel(t.label)
                             Text(t.value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(t.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -315,6 +358,15 @@ private fun Tiles(
                 }
             }
         }
+    }
+}
+
+/** A card's label with a chevron at the end, so a card that opens a screen looks like it does. */
+@Composable
+internal fun OpensLabel(text: String, style: TextStyle = MaterialTheme.typography.labelMedium, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text, Modifier.weight(1f), style = style, color = color)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -351,54 +403,3 @@ private fun CategoryMonthlyCard(c: MonthlyCosts, onCategory: (Category?) -> Unit
     }
 }
 
-@Composable
-private fun StatsGrid(s: Summary) {
-    val tiles = listOf(
-        "Total spent" to money(s.totalCents, s.currency),
-        "Receipts" to s.count.toString(),
-        "Average receipt" to money(s.averageReceiptCents, s.currency),
-        "Tips" to money(s.tipCents, s.currency),
-        "Average tip" to (s.averageTipPercent?.let { "%.1f%%".format(it) } ?: "—"),
-        "Tax" to money(s.taxCents, s.currency),
-        "Discounts" to money(s.discountCents, s.currency),
-        "Pre-tax subtotal" to money(s.subtotalCents, s.currency),
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        tiles.chunked(if (isLargeFont()) 1 else 2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (label, value) ->
-                    Card(Modifier.weight(1f)) {
-                        Column(Modifier.padding(14.dp)) {
-                            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Single-hue horizontal magnitude bars; the label and value text carry identity, not color. */
-@Composable
-private fun Breakdown(rows: List<Pair<String, Long>>, s: Summary, onClick: ((Int) -> Unit)? = null) {
-    val max = rows.maxOfOrNull { it.second }?.coerceAtLeast(1) ?: 1
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            rows.forEachIndexed { i, (label, value) ->
-                Column(if (onClick != null) Modifier.clickable(onClickLabel = "See the breakdown") { onClick(i) } else Modifier) {
-                    val share = if (s.totalCents > 0) " · %.0f%%".format(100.0 * value / s.totalCents) else ""
-                    LabelValue(label, money(value, s.currency) + share)
-                    Spacer(Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { value.toFloat() / max },
-                        modifier = Modifier.fillMaxWidth().height(6.dp),
-                        strokeCap = StrokeCap.Round,
-                        drawStopIndicator = {},
-                        gapSize = 2.dp,
-                    )
-                }
-            }
-        }
-    }
-}

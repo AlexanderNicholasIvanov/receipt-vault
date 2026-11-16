@@ -51,6 +51,8 @@ import com.alexivanov.receiptvault.domain.Money
 import com.alexivanov.receiptvault.domain.Retirement
 import com.alexivanov.receiptvault.domain.RetirementEstimate
 import com.alexivanov.receiptvault.domain.RetirementPlan
+import com.alexivanov.receiptvault.ui.heroMuted
+import com.alexivanov.receiptvault.ui.heroCardColors
 import com.alexivanov.receiptvault.ui.money
 import com.alexivanov.receiptvault.ui.roughMoney
 import com.alexivanov.receiptvault.ui.review.SectionTitle
@@ -202,7 +204,7 @@ fun RetirementScreen(onBack: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 TextButton(onClick = { health = Money.toPlain(suggested) }) {
-                                    Text("Use about ${money(suggested, currency)} a month")
+                                    Text("Use about ${roughMoney(suggested, currency)} a month")
                                 }
                             }
                             Row(
@@ -220,8 +222,8 @@ fun RetirementScreen(onBack: () -> Unit) {
                                 Switch(checked = falls, onCheckedChange = null)
                             }
                             Text(
-                                "Retirement has to pay ${money(estimate.monthlyTodayCents, currency)} a month in today's money " +
-                                    "(${money(estimate.receiptsMonthlyCents, currency)} from receipts).",
+                                "Retirement has to pay ${roughMoney(estimate.monthlyTodayCents, currency)} a month in today's money " +
+                                    "(${roughMoney(estimate.receiptsMonthlyCents, currency)} from receipts).",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(vertical = 4.dp),
@@ -266,52 +268,63 @@ fun RetirementScreen(onBack: () -> Unit) {
 
 @Composable
 private fun Result(e: RetirementEstimate, plan: RetirementPlan, currency: String) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = heroCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val muted = MaterialTheme.colorScheme.onSurfaceVariant
+            val muted = heroMuted()
             if (e.age == null) {
                 Text("You'd need about", style = MaterialTheme.typography.labelLarge, color = muted)
                 Text("${roughMoney(e.neededTodayCents, currency)} in today's money", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "to spend ${money(e.monthlyTodayCents, currency)} a month from ${plan.retireAge} to ${plan.planToAge}. " +
+                    "to spend ${roughMoney(e.monthlyTodayCents, currency)} a month from ${plan.retireAge} to ${plan.planToAge}. " +
                         "Add your age below to see it in the money of the day you retire, and what to save each month.",
                     style = MaterialTheme.typography.bodySmall,
                     color = muted,
                 )
             } else {
                 val retiring = if (e.yearsToRetire == 0) "now" else "at ${plan.retireAge}, in ${e.yearsToRetire} ${if (e.yearsToRetire == 1) "year" else "years"}"
-                Text("You'd need about", style = MaterialTheme.typography.labelLarge, color = muted)
-                Text(roughMoney(e.neededCents, currency), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "when you retire $retiring. That's ${roughMoney(e.neededTodayCents, currency)} in today's money, " +
-                        "for ${e.yearsInRetirement} years of ${money(e.monthlyTodayCents, currency)} a month in today's money " +
-                        "(${roughMoney(e.firstYearCents, currency)} in your first year of retirement).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = muted,
-                )
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                // The answer first: what to do each month. The total behind it comes second.
                 when {
-                    e.shortfallCents == 0L -> Text(
-                        "Your savings, at ${roughMoney(e.savingsAtRetirementCents, currency)} by then, already cover it.",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    e.monthlySavingCents > 0 -> {
-                        Text("Save about ${roughMoney(e.monthlySavingCents, currency)} a month", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    e.shortfallCents == 0L -> {
+                        Text("You're on track", style = MaterialTheme.typography.labelLarge, color = muted)
+                        Text("Your savings cover it", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                         Text(
-                            if (e.savingsAtRetirementCents > 0) {
-                                "until you retire. Your savings so far grow to about ${roughMoney(e.savingsAtRetirementCents, currency)} by then."
-                            } else {
-                                "until you retire, starting now."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
+                            "They grow to about ${roughMoney(e.savingsAtRetirementCents, currency)} by the time you retire.",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = muted,
                         )
                     }
-                    else -> Text(
-                        "You'd be about ${roughMoney(e.shortfallCents, currency)} short today.",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                    e.monthlySavingCents > 0 -> {
+                        Text("To retire $retiring, save about", style = MaterialTheme.typography.labelLarge, color = muted)
+                        Text("${roughMoney(e.monthlySavingCents, currency)} a month", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (e.savingsAtRetirementCents > 0) {
+                                "Your savings so far grow to about ${roughMoney(e.savingsAtRetirementCents, currency)} by then."
+                            } else {
+                                "Starting now."
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = muted,
+                        )
+                    }
+                    else -> {
+                        Text("You'd need about", style = MaterialTheme.typography.labelLarge, color = muted)
+                        Text(roughMoney(e.neededCents, currency), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "You'd be about ${roughMoney(e.shortfallCents, currency)} short today.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = muted,
+                        )
+                    }
                 }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp), color = muted.copy(alpha = 0.3f))
+                Text(
+                    "You'd need about ${roughMoney(e.neededCents, currency)} when you retire $retiring " +
+                        "(${roughMoney(e.neededTodayCents, currency)} in today's money): " +
+                        "${e.yearsInRetirement} years of ${roughMoney(e.monthlyTodayCents, currency)} a month in today's money, " +
+                        "${roughMoney(e.firstYearCents, currency)} in your first year.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted,
+                )
             }
             Text(
                 "Rule of thumb (25 times a year's spending): ${roughMoney(e.ruleOfThumbCents, currency)} in today's money.",

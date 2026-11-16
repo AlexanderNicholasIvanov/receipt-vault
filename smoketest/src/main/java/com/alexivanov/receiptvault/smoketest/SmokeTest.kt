@@ -52,6 +52,8 @@ class SmokeTest {
 
     @Before
     fun launch() {
+        // R8 problems are what this looks for: the profile-recording build has no R8.
+        org.junit.Assume.assumeFalse(BuildConfig.RECORDS_PROFILE)
         device.executeShellCommand("logcat -c -b crash")
         device.pressHome()
         val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE)!!
@@ -80,13 +82,13 @@ class SmokeTest {
         waitFor(label("Receipt"))
         device.pressBack()
 
-        find(By.desc("Insights")).click()
-        waitFor(label("Insights"))
+        find(place("Insights")).click()
+        waitFor(label("Spending"))
         scrollToEnd()
         device.pressBack()
 
-        find(By.desc("Settings")).click()
-        waitFor(label("Settings"))
+        find(place("Settings")).click()
+        waitFor(label("Scanning"))
         scrollToEnd()
         device.pressBack()
 
@@ -135,6 +137,9 @@ class SmokeTest {
     private fun label(text: String): BySelector =
         By.text(Pattern.compile(Pattern.quote(text) + """(\W.*)?""", Pattern.DOTALL))
 
+    /** One of the places in the navigation bar: the tappable item holding the label, not the screen title of the same name. */
+    private fun place(name: String): BySelector = By.clickable(true).hasDescendant(By.text(name))
+
     /** Taps the text field labelled [name] and types into it. */
     private fun type(name: String, text: String) {
         // An empty field reports its label as the hint; some versions report it as the text.
@@ -175,7 +180,7 @@ class SmokeTest {
     private fun screenText(): String =
         device.findObjects(By.textContains("")).mapNotNull { it.text }.filter { it.isNotBlank() }.joinToString(" | ")
 
-    private companion object {
+    companion object {
         const val PACKAGE = "com.alexivanov.receiptvault"
         const val TIMEOUT = 15_000L
     }
