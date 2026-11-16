@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.alexivanov.receiptvault.domain.Problems
@@ -227,6 +228,9 @@ fun HomeScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showSheet = true },
+                // Material's extended FAB hides its label from accessibility services, so TalkBack
+                // would say only "Button" for the app's main action. Name it here.
+                modifier = Modifier.semantics { contentDescription = "Add receipt" },
                 icon = { Icon(painterResource(R.drawable.ic_camera), contentDescription = null) },
                 text = { Text("Add receipt") },
             )

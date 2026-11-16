@@ -68,7 +68,7 @@ class SmokeTest {
 
     @Test
     fun addAReceiptByHandAndVisitEveryScreen() {
-        find(label("Add receipt")).click()
+        find(By.desc("Add receipt")).click()
         find(label("Enter manually")).click()
         type("Merchant", "Smoke Test Cafe")
         type("Total", "12.34")
