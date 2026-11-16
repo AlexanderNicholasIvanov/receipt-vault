@@ -37,6 +37,8 @@ open class ReceiptVaultApp : Application() {
         container = AppContainer(this, releaseSource())
         // WorkManager may be unavailable in some test environments; reminders then run at app start only.
         runCatching { AlertWorker.schedule(this) }
+        // Play services may be missing (tests, some ROMs); scanning then explains instead.
+        runCatching { container.textReader.prepare() }
     }
 
     /** Where updates come from: GitHub Releases. Unit tests answer "up to date" without the network. */

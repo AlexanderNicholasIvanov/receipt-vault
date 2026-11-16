@@ -51,6 +51,8 @@ class AppSmokeTest {
     fun `manual receipt is saved, shown and totalled`() {
         compose.waitForEmptyHome()
 
+        // TalkBack has a name for the main action (Material hides the extended FAB's label).
+        compose.onNodeWithContentDescription("Add receipt").assertExists()
         compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
         compose.onNodeWithText("Import a PDF", useUnmergedTree = true).assertExists()

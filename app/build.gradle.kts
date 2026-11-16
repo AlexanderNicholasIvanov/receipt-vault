@@ -55,10 +55,13 @@ android {
 
     buildTypes {
         release {
-            // Unminified on purpose: readable stack traces from sideloaded builds.
-            isMinifyEnabled = false
-            // Every One UI 8 phone is 64-bit ARM. Dropping the other ABIs' copies of the
-            // ML Kit OCR native library roughly quarters the download.
+            // R8 takes the APK from 45 MB to under 5 MB. Stack traces stay readable: line numbers
+            // are kept, and every release publishes its mapping.txt for `retrace`.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Every One UI 8 phone is 64-bit ARM. Nothing native ships today (OCR runs in Google
+            // Play services); this keeps any future native library to one copy.
             ndk { abiFilters += "arm64-v8a" }
             // CI builds without the key and signs afterwards, in a job that runs none of the build.
             signingConfig = if (providers.gradleProperty("receiptvault.unsignedRelease").isPresent) {
@@ -69,6 +72,13 @@ android {
                 logger.warn("ReceiptVault: RV_KEYSTORE_PATH unset; release APK will be DEBUG-SIGNED.")
                 signingConfigs.getByName("debug")
             }
+        }
+        // The release build, minified the same way but debug-signed and profileable, for the
+        // emulator smoke test in :smoketest. It catches classes R8 removed that are still needed.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
 
@@ -150,6 +160,7 @@ dependencies {
     implementation(libs.exifinterface)
 
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.play.services.base) // ModuleInstall: fetch the OCR model ahead of the first scan
     implementation(libs.mlkit.document.scanner)
 
     implementation(libs.kotlinx.serialization.json)
