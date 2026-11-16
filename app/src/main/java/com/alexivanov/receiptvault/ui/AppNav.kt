@@ -249,7 +249,7 @@ private fun Screens(
                     onManual = { entry.ifResumed { nav.navigate(Routes.review()) } },
                     onCategory = { entry.ifResumed { nav.navigate(Routes.category(it)) } },
                     captureRequests = captureRequestFlow,
-                    openReceiptId = paneReceipt.takeIf { twoPane },
+                    openReceiptId = if (twoPane) paneReceipt() else null,
                     modifier = modifier,
                 )
             }
