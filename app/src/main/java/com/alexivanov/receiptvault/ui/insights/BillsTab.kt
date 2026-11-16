@@ -179,6 +179,14 @@ private fun RecurringCosts(c: MonthlyCosts) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (r.priceUp) {
+                        // An arrow and words, so the change never depends on color alone.
+                        Text(
+                            "▲ Price up: ${money(r.previousCents ?: r.typicalCents, c.currency)} → ${money(r.latestCents, c.currency)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         }

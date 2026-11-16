@@ -52,6 +52,7 @@ import com.alexivanov.receiptvault.domain.UserFacingException
 import com.alexivanov.receiptvault.ui.lock.Authenticator
 import com.alexivanov.receiptvault.ui.formatDateTime
 import com.alexivanov.receiptvault.ui.money
+import com.alexivanov.receiptvault.ui.rememberNotificationPermissionRequest
 import com.alexivanov.receiptvault.ui.review.SectionTitle
 import com.alexivanov.receiptvault.ui.shareFile
 import com.alexivanov.receiptvault.ui.startOutside
@@ -74,6 +75,7 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
     val app = remember { (context.applicationContext as ReceiptVaultApp).container }
     val settings by app.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
     val scope = rememberCoroutineScope()
+    val askNotifications = rememberNotificationPermissionRequest()
     val snackbar = remember { SnackbarHostState() }
     var currency by remember { mutableStateOf("") }
     val updateState by app.updates.state.collectAsStateWithLifecycle()
@@ -225,6 +227,29 @@ fun SettingsScreen(onBack: () -> Unit, onTrash: () -> Unit, onBudgets: () -> Uni
                     )
                 },
                 modifier = Modifier.clickable(onClick = onBudgets),
+            )
+            HorizontalDivider()
+
+            Column(Modifier.padding(horizontal = 16.dp)) { SectionTitle("Notifications") }
+            ListItem(
+                headlineContent = { Text("Spending changes") },
+                supportingContent = { Text("When a regular payment costs more than last time, a new one starts, or a category is well above its usual month.") },
+                trailingContent = {
+                    Switch(checked = settings.spendingAlerts, onCheckedChange = { v ->
+                        if (v) askNotifications()
+                        scope.launch { app.settings.setSpendingAlerts(v); app.checkAlertsSoon() }
+                    })
+                },
+            )
+            ListItem(
+                headlineContent = { Text("Remind me the day before a bill") },
+                supportingContent = { Text("For payments found on a monthly, quarterly or yearly cycle.") },
+                trailingContent = {
+                    Switch(checked = settings.billReminders, onCheckedChange = { v ->
+                        if (v) askNotifications()
+                        scope.launch { app.settings.setBillReminders(v); app.checkAlertsSoon() }
+                    })
+                },
             )
             HorizontalDivider()
 
