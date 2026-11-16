@@ -81,7 +81,8 @@ class MonthlyCostsTest {
         assertEquals("Every month", CostEstimate.everyLabel(r.everyDays))
         assertEquals(1_599, r.monthlyCents)
         assertEquals(LocalDate.of(2026, 11, 3), r.lastDate)
-        assertEquals(LocalDate.of(2026, 11, 3).plusDays(r.everyDays.toLong()), r.nextDate)
+        // A monthly bill keeps its day of the month, whatever the month's length.
+        assertEquals(LocalDate.of(2026, 12, 3), r.nextDate)
     }
 
     @Test

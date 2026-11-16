@@ -10,6 +10,8 @@ import com.alexivanov.receiptvault.AppContainer
 import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
+import com.alexivanov.receiptvault.domain.CategoryMemory
+import com.alexivanov.receiptvault.domain.CostEstimate
 import com.alexivanov.receiptvault.domain.Duplicates
 import com.alexivanov.receiptvault.domain.LineAssembler
 import com.alexivanov.receiptvault.domain.Money
@@ -25,6 +27,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -94,11 +99,16 @@ sealed interface ReviewState {
         val duplicateOf: Receipt? = null,
         /** The form as it first opened; null for one resumed after Android closed the app. */
         val original: ReceiptDraft? = null,
+        /** The category was set from this store's earlier receipts; the screen says so, with Undo. */
+        val learned: LearnedCategory? = null,
     ) : ReviewState {
         /** Leaving now would lose something: typed changes, or a new photo that exists nowhere else. */
         val hasUnsavedWork: Boolean get() = draft != original || (isNew && imagePath != null)
     }
     data class Failed(val message: String) : ReviewState
+
+    /** [category] came from the user's earlier receipts from [merchant]; Undo goes back to [instead]. */
+    data class LearnedCategory(val category: Category, val merchant: String, val instead: Category)
 }
 
 class ReviewViewModel(
@@ -109,6 +119,20 @@ class ReviewViewModel(
     private val receiptId: Long = handle.get<String>("id")?.toLongOrNull() ?: 0L
     /** One photo, several scanned pages, or a PDF. */
     private val imageUris: List<String> = PageUris.decode(handle.get<String>("uri"))
+
+    private val source: CaptureSource =
+        CaptureSource.entries.firstOrNull { it.name == handle.get<String>("source") } ?: CaptureSource.MANUAL
+
+    /**
+     * A new receipt from the scanner, the camera or typed in can be saved straight into the next
+     * one of the same kind, for a pile of receipts at once. Null when that makes no sense: editing,
+     * or a photo shared from another app.
+     */
+    val next: CaptureSource? = source.takeIf { receiptId == 0L && it in setOf(CaptureSource.SCAN, CaptureSource.CAMERA, CaptureSource.MANUAL) }
+
+    /** The last save asked for the next receipt; read once [saved] is set. */
+    var thenNext = false
+        private set
 
     private val _state = MutableStateFlow<ReviewState>(ReviewState.Working("Starting…"))
     val state: StateFlow<ReviewState> = _state
@@ -122,6 +146,17 @@ class ReviewViewModel(
     private var ocrText: String = ""
     private var imagePath: String? = null
     private var nextKey = 1L
+
+    /** Once the user picks a category themselves, it is never changed for them. */
+    private var categoryPicked = false
+
+    /** Each store's last category, from the saved receipts. */
+    private val memory: StateFlow<Map<String, Category>> = app.receipts.receipts
+        .map { CategoryMemory.learn(it) }
+        .flowOn(Dispatchers.Default)
+        // Only a convenience: if the database fails, the form keeps working without it.
+        .catch { Log.w(TAG, "Couldn't learn categories", it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     init {
         viewModelScope.launch {
@@ -254,11 +289,22 @@ class ReviewViewModel(
             joinPages(pages) { notice = notice ?: it }
         }
 
-        _state.value = ReviewState.Editing(
-            draft = parsed.toDraft(settings.defaultCurrency),
-            isNew = true,
-            imagePath = imagePath,
-            notice = notice,
+        val learned = try {
+            withContext(Dispatchers.Default) { CategoryMemory.learn(app.receipts.receipts.first()) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't learn categories", e)
+            emptyMap()
+        }
+        _state.value = withLearned(
+            ReviewState.Editing(
+                draft = parsed.toDraft(settings.defaultCurrency),
+                isNew = true,
+                imagePath = imagePath,
+                notice = notice,
+            ),
+            learned,
         )
         markOriginal()
     }
@@ -310,16 +356,57 @@ class ReviewViewModel(
         _state.update { s -> if (s is ReviewState.Editing) s.copy(draft = transform(s.draft), error = null) else s }
     }
 
+    fun setMerchant(merchant: String) = _state.update { s ->
+        if (s is ReviewState.Editing) withLearned(s.copy(draft = s.draft.copy(merchant = merchant), error = null), memory.value) else s
+    }
+
+    fun pickCategory(category: Category) {
+        categoryPicked = true
+        _state.update { s -> if (s is ReviewState.Editing) s.copy(draft = s.draft.copy(category = category), learned = null) else s }
+    }
+
+    /** Back to the category the receipt had before this store's was used, and no more changes. */
+    fun undoLearnedCategory() {
+        categoryPicked = true
+        _state.update { s ->
+            val l = (s as? ReviewState.Editing)?.learned ?: return@update s
+            s.copy(draft = s.draft.copy(category = l.instead), learned = null)
+        }
+    }
+
+    /**
+     * A new receipt from a store the user has given a category before starts with that category.
+     * If the merchant is then changed to one with no history, the earlier category comes back.
+     */
+    private fun withLearned(s: ReviewState.Editing, memory: Map<String, Category>): ReviewState.Editing {
+        if (!s.isNew || categoryPicked) return s
+        val known = memory[CostEstimate.merchantKey(s.draft.merchant)]
+        val shown = s.learned
+        return when {
+            known != null && known != s.draft.category -> s.copy(
+                draft = s.draft.copy(category = known),
+                learned = ReviewState.LearnedCategory(known, s.draft.merchant.trim(), shown?.instead ?: s.draft.category),
+            )
+            known != null -> s
+            shown != null -> s.copy(draft = s.draft.copy(category = shown.instead), learned = null)
+            else -> s
+        }
+    }
+
     fun addItem() = edit { it.copy(items = it.items + ItemDraft(nextKey++, "", "1", "")) }
 
     fun dismissNotice() = _state.update { s -> if (s is ReviewState.Editing) s.copy(notice = null) else s }
 
     fun dismissDuplicate() = _state.update { s -> if (s is ReviewState.Editing) s.copy(duplicateOf = null) else s }
 
-    /** @param allowDuplicate the user has seen the "already saved?" question and wants a second copy. */
-    fun save(allowDuplicate: Boolean = false) {
+    /**
+     * @param allowDuplicate the user has seen the "already saved?" question and wants a second copy.
+     * @param thenNext go on to the next receipt; kept from the first tap when "Save anyway" follows.
+     */
+    fun save(allowDuplicate: Boolean = false, thenNext: Boolean = this.thenNext) {
         val s = _state.value as? ReviewState.Editing ?: return
         if (saving) return
+        this.thenNext = thenNext && next != null
         val d = s.draft
         val total = Money.parseUserInput(d.total) ?: d.computedTotal
         if (total == null) {

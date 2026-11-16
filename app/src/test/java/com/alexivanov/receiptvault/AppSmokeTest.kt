@@ -3,18 +3,25 @@ package com.alexivanov.receiptvault
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.alexivanov.receiptvault.data.LineItem
 import com.alexivanov.receiptvault.data.Receipt
 import com.alexivanov.receiptvault.domain.Category
 import com.alexivanov.receiptvault.domain.ExchangeRates
@@ -283,11 +290,177 @@ class AppSmokeTest {
         compose.waitUntilAtLeastOneExists(hasText("Netflix"), UI_WAIT)
 
         compose.onNodeWithContentDescription("Insights").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Monthly cost"), UI_WAIT)
-        compose.onNodeWithText("Average of 3 receipts since", substring = true).assertExists()
+        compose.waitUntilAtLeastOneExists(hasText("You spend about"), UI_WAIT)
+        compose.onNodeWithText("3 receipts since", substring = true).assertExists()
+        // The current month is labelled as unfinished, for TalkBack too.
+        compose.onNodeWithContentDescription(", so far: ", substring = true).assertExists()
+        compose.onNodeWithText("Table").performClick()
+        compose.onNodeWithText("(so far)", substring = true).assertExists()
+
+        // The Recurring tile opens the Bills tab.
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("1 regular payment"))
+        compose.onNodeWithText("1 regular payment").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Due in the next 7 days"), UI_WAIT)
+        compose.onNodeWithText("Nothing due this week.").assertExists()
+        // Paid today; next month's is the only one due.
+        compose.onNodeWithText("1 of 1 paid").assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Recurring costs"))
         compose.onNodeWithText("Recurring: $15.99 a month from 1 regular payment").assertExists()
-        compose.onNodeWithText("Recurring costs").assertExists()
         compose.onNodeWithText("Every month · usually $15.99", substring = true).assertExists()
+
+        compose.onNodeWithText("Future").performClick()
+        // No line items, so no rate yet: the card says what it needs.
+        compose.waitUntilAtLeastOneExists(hasText("Your inflation"), UI_WAIT)
+        compose.onNodeWithText("Keep line items on your receipts", substring = true).assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("At this pace"))
+    }
+
+    @Test
+    fun `a category shows what is usually bought and where`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        runBlocking {
+            app.settings.setDefaultCurrency("USD")
+            val now = System.currentTimeMillis()
+            listOf(349L, 379L).forEach { milk ->
+                app.receipts.save(
+                    Receipt(merchant = "Kroger", category = Category.GROCERIES.name, totalCents = milk + 129, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now),
+                    listOf(
+                        LineItem(receiptId = 0, position = 0, name = "Milk 1 gal", priceCents = milk),
+                        LineItem(receiptId = 0, position = 1, name = "Bananas", priceCents = 129),
+                    ),
+                )
+            }
+        }
+        compose.waitUntilAtLeastOneExists(hasText("Kroger"), UI_WAIT)
+
+        compose.onNodeWithContentDescription("Insights").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("You spend about"), UI_WAIT)
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("A month, by category"))
+        compose.onAllNodesWithText("🛒 Groceries")[0].performClick()
+        compose.waitUntilAtLeastOneExists(hasText("What you usually buy here"), UI_WAIT)
+        compose.onNodeWithText("You usually pay").assertExists()
+        compose.onNodeWithText("Milk 1 gal").assertExists()
+        compose.onNodeWithText("Bought 2 times · $3.49–$3.79", substring = true).assertExists()
+        compose.onNodeWithText("2 visits · usually", substring = true).assertExists()
+
+        // An item opens its price over time.
+        compose.onNodeWithText("Milk 1 gal").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Every purchase"), UI_WAIT)
+        compose.onNodeWithText("Last paid").assertExists()
+        compose.onNodeWithText("Bought 2 times · cheapest $3.49 at Kroger").assertExists()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("What you usually buy here"), UI_WAIT)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+
+        compose.waitUntilAtLeastOneExists(hasText("You spend about"), UI_WAIT)
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("See everything you buy"))
+        compose.onNodeWithText("See everything you buy").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Everything you buy"), UI_WAIT)
+        compose.onNodeWithText("Bananas").assertExists()
+    }
+
+    @Test
+    fun `retirement estimate uses the receipts and remembers the age`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        try {
+            runBlocking {
+                app.settings.setDefaultCurrency("USD")
+                val now = System.currentTimeMillis()
+                app.receipts.save(Receipt(merchant = "Kroger", category = Category.GROCERIES.name, totalCents = 100_000, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now), emptyList())
+            }
+            compose.waitUntilAtLeastOneExists(hasText("Kroger"), UI_WAIT)
+
+            compose.onNodeWithContentDescription("Insights").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Future"), UI_WAIT)
+            compose.onNodeWithText("Future").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Retirement"), UI_WAIT)
+            compose.onNodeWithText("Retirement").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Spending in retirement"), UI_WAIT)
+            // $1,000 a month from receipts; 25 years of it is the rule of thumb.
+            compose.onNodeWithText("Rule of thumb (25 times a year's spending): $300,000 in today's money.").assertExists()
+            compose.onNodeWithText("Add your age below", substring = true).assertExists()
+
+            compose.onNodeWithText("Your age").performScrollTo().performTextInput("40")
+            compose.waitUntilAtLeastOneExists(hasText("Save about", substring = true), UI_WAIT)
+            compose.onNodeWithText("when you retire at 65, in 25 years", substring = true).assertExists()
+            compose.waitUntil(UI_WAIT) { runBlocking { app.settings.current().retirement.birthYear } == LocalDate.now().year - 40 }
+
+            // The range, and retiring at another age.
+            val list = compose.onAllNodes(hasScrollAction()).onFirst()
+            list.performScrollToNode(hasText("A range, not one number"))
+            compose.onNodeWithText("Comfortable").assertExists()
+            list.performScrollToNode(hasText("At 67"))
+            compose.onNodeWithText("At 67").performScrollTo().performClick()
+            list.performScrollToIndex(0)
+            compose.waitUntilAtLeastOneExists(hasText("when you retire at 67, in 27 years", substring = true), UI_WAIT)
+
+            // A US healthcare figure, in one tap.
+            list.performScrollToNode(hasText("Use about", substring = true))
+            compose.onNodeWithText("Use about", substring = true).performScrollTo().performClick()
+            // Let the screen recompose and start saving before polling what was saved: polling alone
+            // doesn't always run the main looper, and on CI the save then never started.
+            compose.waitForIdle()
+            compose.waitUntil(UI_WAIT) { runBlocking { app.settings.current().retirement.healthcareMonthlyCents } > 0 }
+
+            compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            compose.waitUntilAtLeastOneExists(hasText("by age 67", substring = true), UI_WAIT)
+        } finally {
+            runBlocking { app.settings.setRetirementPlan(com.alexivanov.receiptvault.domain.RetirementPlan()) }
+        }
+    }
+
+    @Test
+    fun `a new receipt from a known store starts with its category, with undo`() {
+        val app = ApplicationProvider.getApplicationContext<ReceiptVaultApp>().container
+        compose.waitForEmptyHome()
+        runBlocking {
+            val now = System.currentTimeMillis()
+            app.receipts.save(Receipt(merchant = "Joe's Diner", category = Category.DINING.name, totalCents = 2_000, currency = "USD", purchasedAt = now, createdAt = now, updatedAt = now), emptyList())
+        }
+        compose.waitUntilAtLeastOneExists(hasText("Joe's Diner"), UI_WAIT)
+
+        compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
+        compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
+        val dining = "${Category.DINING.emoji} ${Category.DINING.label}"
+        val other = "${Category.OTHER.emoji} ${Category.OTHER.label}"
+        compose.onNodeWithText(other).assertIsSelected()
+
+        compose.onNodeWithText("Merchant").performTextInput("JOE'S DINER")
+        compose.waitUntilAtLeastOneExists(hasText("Dining, as on your other receipts from JOE'S DINER."), UI_WAIT)
+        compose.onNodeWithText(dining).assertIsSelected()
+
+        compose.onNodeWithText("Undo").performClick()
+        compose.onNodeWithText(other).assertIsSelected()
+        compose.onNodeWithText("Dining, as on your", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a pile of receipts can be typed in one after another`() {
+        compose.waitForEmptyHome()
+        compose.onNodeWithText("Add receipt", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Enter manually"), UI_WAIT)
+        compose.onNodeWithText("Enter manually", useUnmergedTree = true).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
+        compose.onNodeWithText("Merchant").performTextInput("First Shop")
+        compose.onNodeWithText("Total").performTextInput("12.00")
+        compose.onNodeWithText("Save and add another").performScrollTo().performClick()
+
+        // Straight into an empty form for the next one.
+        compose.waitUntil(UI_WAIT) { compose.onAllNodesWithText("First Shop").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntilAtLeastOneExists(hasText("Merchant"), UI_WAIT)
+        compose.onNodeWithText("Merchant").performTextInput("Second Shop")
+        compose.onNodeWithText("Total").performTextInput("7.50")
+        compose.onNodeWithText("Save receipt", useUnmergedTree = true).performScrollTo().performClick()
+
+        // The last one opens as usual; both are saved.
+        compose.waitUntilAtLeastOneExists(hasText("$7.50"), UI_WAIT)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(hasText("First Shop"), UI_WAIT)
+        compose.onNodeWithText("Second Shop").assertExists()
     }
 
     private fun addManualReceipt(merchant: String, total: String, tags: String? = null) {
@@ -308,7 +481,11 @@ class AppSmokeTest {
 
         compose.onNodeWithContentDescription("Insights").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Monthly spending"), UI_WAIT)
-        compose.onNodeWithText("Average tip").assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Average tip"))
+        compose.onNodeWithText("Bills").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Nothing repeats regularly yet", substring = true), UI_WAIT)
+        compose.onNodeWithText("Future").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("projected forward here", substring = true), UI_WAIT)
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), UI_WAIT)
@@ -317,6 +494,8 @@ class AppSmokeTest {
         compose.onNodeWithText("Day-first dates").assertExists()
         compose.onNodeWithText("App lock").assertExists()
         compose.onNodeWithText("Save scan location").assertDoesNotExist()
+        compose.onNodeWithText("Spending changes", useUnmergedTree = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Remind me the day before a bill", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Back up receipts", useUnmergedTree = true).performScrollTo().assertExists()
         compose.onNodeWithText("Restore from backup", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Trash", useUnmergedTree = true).performScrollTo().assertExists()

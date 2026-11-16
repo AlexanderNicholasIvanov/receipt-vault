@@ -41,7 +41,67 @@ data class Summary(
     val ratesDate: LocalDate? = null,
 )
 
+/** Everything the Insights screen shows, worked out in one go off the main thread. */
+data class InsightsOverview(
+    val summary: Summary,
+    /** The last 6 months' totals in [Summary.currency]. */
+    val monthly: List<Pair<YearMonth, Long>>,
+    val costs: MonthlyCosts,
+    /** Recent spending against earlier spending, in [MonthlyCosts.currency]; null until there is enough history. */
+    val trend: Trend? = null,
+)
+
+/** The last 3 full months' spending against the 3 full months before them. */
+data class Trend(
+    /** Rounded to a whole percent; positive means spending went up. */
+    val percent: Int,
+    /** The average month of the recent 3. */
+    val recentMonthlyCents: Long,
+    /** The average month of the 3 before. */
+    val earlierMonthlyCents: Long,
+)
+
 object Insights {
+
+    /**
+     * The Insights screen's numbers. With thousands of receipts this takes several milliseconds
+     * (the recurring-cost search is most of it), so callers run it on a background thread.
+     */
+    fun overview(
+        receipts: List<Receipt>,
+        period: Period,
+        fallbackCurrency: String,
+        today: LocalDate,
+        rates: ExchangeRates? = null,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): InsightsOverview {
+        val summary = summarize(inPeriod(receipts, period, today, zone), fallbackCurrency, rates)
+        val converted = Conversion.toBase(receipts, rates)
+        val costs = CostEstimate.monthly(receipts, fallbackCurrency, today, rates, zone)
+        return InsightsOverview(
+            summary = summary,
+            monthly = monthly(converted, summary.currency, today, zone = zone),
+            costs = costs,
+            trend = trend(converted, costs.currency, today, zone),
+        )
+    }
+
+    /**
+     * Compares the 3 full months before this one with the 3 full months before those. Needs
+     * receipts from the first week of the oldest month on, or a part month would look like a
+     * drop in spending. Null without that history, or when the earlier months are empty.
+     */
+    fun trend(receipts: List<Receipt>, currency: String, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Trend? {
+        val same = receipts.filter { it.currency == currency }
+        val first = same.minOfOrNull { localDate(it.purchasedAt, zone) } ?: return null
+        val months = monthly(same, currency, today, months = 7, zone = zone)
+        if (first.isAfter(months.first().first.atDay(7))) return null
+        val earlier = months.subList(0, 3).sumOf { it.second }
+        val recent = months.subList(3, 6).sumOf { it.second }
+        if (earlier <= 0) return null
+        val percent = Math.floorDiv((recent - earlier) * 200 + earlier, earlier * 2).toInt()
+        return Trend(percent, Math.floorDiv(recent + 1, 3), Math.floorDiv(earlier + 1, 3))
+    }
 
     fun localDate(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): LocalDate =
         Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()

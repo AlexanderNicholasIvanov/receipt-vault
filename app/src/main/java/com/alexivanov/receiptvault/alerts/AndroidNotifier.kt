@@ -16,6 +16,7 @@ import com.alexivanov.receiptvault.domain.AlertText
 import com.alexivanov.receiptvault.domain.AlertTexts
 import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Reminder
+import com.alexivanov.receiptvault.domain.SpendingAlert
 
 class AndroidNotifier(private val context: Context) : Notifier {
 
@@ -26,6 +27,8 @@ class AndroidNotifier(private val context: Context) : Notifier {
             listOf(
                 channel(CHANNEL_REMINDERS, "Return & warranty reminders", "Before a return window or warranty runs out."),
                 channel(CHANNEL_BUDGETS, "Budget warnings", "When a monthly budget is nearly or fully used."),
+                channel(CHANNEL_SPENDING, "Spending changes", "A price rise on a regular payment, a new one, or a category above its usual month."),
+                channel(CHANNEL_BILLS, "Bill reminders", "The day before a regular bill is due."),
             ),
         )
     }
@@ -45,6 +48,14 @@ class AndroidNotifier(private val context: Context) : Notifier {
         post(
             id = "budget:${use.category?.name}".hashCode(),
             notification = build(CHANNEL_BUDGETS, AlertTexts.budget(use, currency, hideDetails), open(null)),
+        )
+    }
+
+    override fun spending(alert: SpendingAlert, currency: String, hideDetails: Boolean) {
+        val channel = if (alert is SpendingAlert.DueTomorrow) CHANNEL_BILLS else CHANNEL_SPENDING
+        post(
+            id = alert.key.hashCode(),
+            notification = build(channel, AlertTexts.spending(alert, currency, hideDetails), open(null)),
         )
     }
 
@@ -90,5 +101,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
     companion object {
         const val CHANNEL_REMINDERS = "reminders"
         const val CHANNEL_BUDGETS = "budgets"
+        const val CHANNEL_SPENDING = "spending"
+        const val CHANNEL_BILLS = "bills"
     }
 }
