@@ -146,6 +146,7 @@ fun AppNav(
                     onInsights = { entry.ifResumed { nav.navigate(Routes.INSIGHTS) } },
                     onSettings = { entry.ifResumed { nav.navigate(Routes.SETTINGS) } },
                     captureRequests = captureRequestFlow,
+                    openReceiptId = paneReceipt.takeIf { twoPane },
                     modifier = modifier,
                 )
             }

@@ -1,6 +1,8 @@
 package com.alexivanov.receiptvault
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -38,19 +40,23 @@ class TwoPaneTest {
     fun `a receipt opens beside the list, and stays open when the phone folds`() {
         compose.waitForEmptyHome()
         compose.onNodeWithText("Choose a receipt to see it here.").assertExists()
+        compose.onNode(hasStateDescription(OPEN)).assertDoesNotExist()
         addReceipt("Corner Store", 899, "Oat Milk")
         addReceipt("Bakery", 450, "Sourdough")
         compose.waitUntilAtLeastOneExists(hasText("Corner Store"), 10_000)
 
         compose.onNodeWithText("Corner Store").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Oat Milk"), 10_000)
-        // The list is still there beside it.
+        // The list is still there beside it, with the open receipt marked.
         compose.onNodeWithText("Bakery").assertExists()
+        compose.onNode(hasStateDescription(OPEN)).assert(hasText("Corner Store", substring = true))
 
         // Another receipt replaces it in the same pane.
         compose.onNodeWithText("Bakery").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Sourdough"), 10_000)
         compose.onNodeWithText("Oat Milk").assertDoesNotExist()
+        compose.waitUntilExactlyOneExists(hasStateDescription(OPEN), 10_000)
+        compose.onNode(hasStateDescription(OPEN)).assert(hasText("Bakery", substring = true))
 
         // Folded to a phone-sized screen, the open receipt fills it.
         RuntimeEnvironment.setQualifiers("w411dp-h900dp")
@@ -59,5 +65,11 @@ class TwoPaneTest {
         compose.onNodeWithText("Corner Store").assertDoesNotExist()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Corner Store"), 10_000)
+        // One pane again: nothing is marked open.
+        compose.onNode(hasStateDescription(OPEN)).assertDoesNotExist()
+    }
+
+    private companion object {
+        const val OPEN = "Open beside the list"
     }
 }
