@@ -1,5 +1,9 @@
 package com.alexivanov.receiptvault.domain
 
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+
 data class AlertText(val title: String, val text: String)
 
 /**
@@ -30,6 +34,44 @@ object AlertTexts {
         val limit = Money.format(use.budgetCents, currency)
         return AlertText(title, "$spent of $limit spent this month.")
     }
+
+    fun spending(alert: SpendingAlert, currency: String, hideDetails: Boolean): AlertText {
+        fun m(cents: Long) = Money.format(cents, currency)
+        return when (alert) {
+            is SpendingAlert.PriceUp -> if (hideDetails) {
+                AlertText("A regular payment went up", OPEN_TO_SEE)
+            } else {
+                val b = alert.bill
+                val before = b.previousCents ?: b.typicalCents
+                val percent = Math.floorDiv((b.latestCents - before) * 200 + before, before * 2)
+                AlertText("Price up: ${b.merchant}", "${m(before)} → ${m(b.latestCents)} (+$percent%) on ${formatDay(b.lastDate)}.")
+            }
+            is SpendingAlert.DueTomorrow -> if (hideDetails) {
+                AlertText("A bill is due tomorrow", OPEN_TO_SEE)
+            } else {
+                AlertText("Due tomorrow: ${alert.bill.merchant}", "Usually ${m(alert.bill.typicalCents)}.")
+            }
+            is SpendingAlert.NewRegular -> if (hideDetails) {
+                AlertText("A new regular payment", OPEN_TO_SEE)
+            } else {
+                val b = alert.bill
+                AlertText(
+                    "New regular payment: ${b.merchant}",
+                    "${m(b.typicalCents)} ${CostEstimate.everyLabel(b.everyDays).lowercase()}, about ${m(b.monthlyCents * 12)} a year.",
+                )
+            }
+            is SpendingAlert.AboveUsual -> if (hideDetails) {
+                AlertText("Spending is above usual", OPEN_TO_SEE)
+            } else {
+                AlertText(
+                    "${alert.category.label} is above usual",
+                    "${m(alert.spentCents)} so far this month; a usual month is about ${m(alert.usualCents)}.",
+                )
+            }
+        }
+    }
+
+    private fun formatDay(d: LocalDate) = d.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
 
     private const val OPEN_TO_SEE = "Open Receipt Vault to see the details."
 }

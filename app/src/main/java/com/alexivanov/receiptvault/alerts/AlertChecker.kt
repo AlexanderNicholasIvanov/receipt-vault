@@ -5,9 +5,12 @@ import com.alexivanov.receiptvault.data.SettingsRepository
 import com.alexivanov.receiptvault.domain.BudgetLevel
 import com.alexivanov.receiptvault.domain.BudgetMath
 import com.alexivanov.receiptvault.domain.Conversion
+import com.alexivanov.receiptvault.domain.Insights
 import com.alexivanov.receiptvault.domain.BudgetUse
 import com.alexivanov.receiptvault.domain.Reminder
 import com.alexivanov.receiptvault.domain.Reminders
+import com.alexivanov.receiptvault.domain.SpendingAlert
+import com.alexivanov.receiptvault.domain.SpendingAlerts
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
@@ -22,10 +25,11 @@ interface Notifier {
     /** [hideDetails]: app lock is on, so no merchant or amount appears even on an unlocked phone. */
     fun reminder(reminder: Reminder, hideDetails: Boolean)
     fun budget(use: BudgetUse, currency: String, hideDetails: Boolean)
+    fun spending(alert: SpendingAlert, currency: String, hideDetails: Boolean)
 }
 
 /**
- * Sends each due return/warranty reminder and each budget warning once.
+ * Sends each due return/warranty reminder, budget warning and spending alert once.
  * Runs daily from [AlertWorker], at app start, and after a receipt is saved.
  */
 class AlertChecker(
@@ -61,6 +65,18 @@ class AlertChecker(
             }
         }
 
+        if (s.spendingAlerts || s.billReminders) {
+            // The currency the monthly costs, and so the alerts, are worked out in.
+            val currency = Insights.primaryCurrency(Conversion.toBase(all, s.activeRates), s.defaultCurrency)
+            val found = SpendingAlerts.find(all, s.defaultCurrency, today, dueReminders = s.billReminders, rates = s.activeRates, zone = zone)
+            for (alert in found) {
+                val wanted = if (alert is SpendingAlert.DueTomorrow) s.billReminders else s.spendingAlerts
+                if (!wanted || alert.key in sent) continue
+                notifier.spending(alert, currency, hideDetails = s.appLock)
+                posted += alert.key
+            }
+        }
+
         if (posted.isNotEmpty() || sent.any { !isRecent(it, today) }) {
             settings.setSentAlerts((sent + posted).filterTo(HashSet()) { isRecent(it, today) })
         }
@@ -73,6 +89,7 @@ class AlertChecker(
         val date = runCatching {
             when (parts.firstOrNull()) {
                 "budget" -> YearMonth.parse(parts[1]).atEndOfMonth()
+                "category" -> YearMonth.parse(parts.last()).atEndOfMonth()
                 else -> LocalDate.parse(parts.last())
             }
         }.getOrNull() ?: return false

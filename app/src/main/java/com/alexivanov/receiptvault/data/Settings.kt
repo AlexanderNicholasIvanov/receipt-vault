@@ -49,6 +49,10 @@ data class AppSettings(
     val exchangeRates: ExchangeRates? = null,
     /** Age, savings and assumptions for the retirement estimate. */
     val retirement: RetirementPlan = RetirementPlan(),
+    /** Notify about price rises, new regular payments and categories above their usual month. */
+    val spendingAlerts: Boolean = true,
+    /** Notify the day before a monthly (or quarterly, yearly) bill is due. Off unless turned on. */
+    val billReminders: Boolean = false,
 ) {
     /** The rates to convert with right now: on, downloaded, and for the current default currency. */
     val activeRates: ExchangeRates?
@@ -69,6 +73,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     private val convertKey = booleanPreferencesKey("convert_currencies")
     private val ratesKey = stringPreferencesKey("exchange_rates")
     private val retirementKey = stringPreferencesKey("retirement_plan")
+    private val spendingAlertsKey = booleanPreferencesKey("spending_alerts")
+    private val billRemindersKey = booleanPreferencesKey("bill_reminders")
 
     // A read error (rare: storage trouble) shows defaults rather than crashing the screen.
     val settings: Flow<AppSettings> = store.data.catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }.map { p ->
@@ -84,6 +90,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             convertCurrencies = p[convertKey] ?: false,
             exchangeRates = ExchangeRates.decode(p[ratesKey]),
             retirement = RetirementPlan.decode(p[retirementKey]),
+            spendingAlerts = p[spendingAlertsKey] ?: defaults.spendingAlerts,
+            billReminders = p[billRemindersKey] ?: defaults.billReminders,
         )
     }
 
@@ -106,6 +114,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setLastBackupAt(value: Long) = store.edit { it[lastBackup] = value }
     suspend fun setBudgets(value: Budgets) = store.edit { it[budgetsKey] = value.encode() }
     suspend fun setRetirementPlan(value: RetirementPlan) = store.edit { it[retirementKey] = value.encode() }
+    suspend fun setSpendingAlerts(value: Boolean) = store.edit { it[spendingAlertsKey] = value }
+    suspend fun setBillReminders(value: Boolean) = store.edit { it[billRemindersKey] = value }
     suspend fun setConvertCurrencies(value: Boolean) = store.edit { it[convertKey] = value }
     suspend fun setExchangeRates(value: ExchangeRates?) = store.edit {
         if (value == null) it.remove(ratesKey) else it[ratesKey] = value.encode()
