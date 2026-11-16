@@ -132,7 +132,7 @@ object CostEstimate {
                     everyDays = every.toInt(),
                     monthlyCents = perMonthEvery(typical, every),
                     lastDate = last,
-                    nextDate = last.plusDays(every),
+                    nextDate = dueDate(last, every.toInt(), 1),
                 )
             }
             .sortedByDescending { it.monthlyCents }
@@ -146,6 +146,16 @@ object CostEstimate {
         val denominator = if (months != null) months.toLong() else days * MONTH_DEN
         val numerator = if (months != null) cents else cents * MONTH_NUM
         return Math.floorDiv(numerator + denominator / 2, denominator)
+    }
+
+    /**
+     * The [n]th payment after [last] for a bill paid every [everyDays] days. Bills on a calendar
+     * cycle keep their day of the month (the 15th stays the 15th, and the 31st becomes the last
+     * day of a shorter month); other bills step by days.
+     */
+    fun dueDate(last: LocalDate, everyDays: Int, n: Long): LocalDate {
+        val months = calendarMonths(everyDays)
+        return if (months != null) last.plusMonths(months * n) else last.plusDays(everyDays * n)
     }
 
     /** The calendar cycle a gap of [days] days stands for: 1, 2, 3, 6 or 12 months; null for other gaps. */

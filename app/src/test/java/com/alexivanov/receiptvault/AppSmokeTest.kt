@@ -3,14 +3,17 @@ package com.alexivanov.receiptvault
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
@@ -285,11 +288,26 @@ class AppSmokeTest {
         compose.waitUntilAtLeastOneExists(hasText("Netflix"), 10_000)
 
         compose.onNodeWithContentDescription("Insights").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Monthly cost"), 5_000)
-        compose.onNodeWithText("Average of 3 receipts since", substring = true).assertExists()
+        compose.waitUntilAtLeastOneExists(hasText("You spend about"), 5_000)
+        compose.onNodeWithText("3 receipts since", substring = true).assertExists()
+        // The current month is labelled as unfinished, for TalkBack too.
+        compose.onNodeWithContentDescription(", so far: ", substring = true).assertExists()
+        compose.onNodeWithText("Table").performClick()
+        compose.onNodeWithText("(so far)", substring = true).assertExists()
+
+        // The Recurring tile opens the Bills tab.
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("1 regular payment"))
+        compose.onNodeWithText("1 regular payment").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Due in the next 7 days"), 5_000)
+        compose.onNodeWithText("Nothing due this week.").assertExists()
+        // Paid today; next month's is the only one due.
+        compose.onNodeWithText("1 of 1 paid").assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Recurring costs"))
         compose.onNodeWithText("Recurring: $15.99 a month from 1 regular payment").assertExists()
-        compose.onNodeWithText("Recurring costs").assertExists()
         compose.onNodeWithText("Every month · usually $15.99", substring = true).assertExists()
+
+        compose.onNodeWithText("Future").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("At this pace"), 5_000)
     }
 
     @Test
@@ -312,7 +330,8 @@ class AppSmokeTest {
         compose.waitUntilAtLeastOneExists(hasText("Kroger"), 10_000)
 
         compose.onNodeWithContentDescription("Insights").performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Monthly cost"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("You spend about"), 5_000)
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("A month, by category"))
         compose.onAllNodesWithText("🛒 Groceries")[0].performClick()
         compose.waitUntilAtLeastOneExists(hasText("What you usually buy here"), 5_000)
         compose.onNodeWithText("You usually pay").assertExists()
@@ -321,7 +340,8 @@ class AppSmokeTest {
         compose.onNodeWithText("2 visits · usually", substring = true).assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
-        compose.waitUntilAtLeastOneExists(hasText("See everything you buy"), 5_000)
+        compose.waitUntilAtLeastOneExists(hasText("You spend about"), 5_000)
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("See everything you buy"))
         compose.onNodeWithText("See everything you buy").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Everything you buy"), 5_000)
         compose.onNodeWithText("Bananas").assertExists()
@@ -340,6 +360,8 @@ class AppSmokeTest {
             compose.waitUntilAtLeastOneExists(hasText("Kroger"), 10_000)
 
             compose.onNodeWithContentDescription("Insights").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Future"), 5_000)
+            compose.onNodeWithText("Future").performClick()
             compose.waitUntilAtLeastOneExists(hasText("Retirement"), 5_000)
             compose.onNodeWithText("Retirement").performClick()
             compose.waitUntilAtLeastOneExists(hasText("Spending in retirement"), 5_000)
@@ -377,7 +399,11 @@ class AppSmokeTest {
 
         compose.onNodeWithContentDescription("Insights").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Monthly spending"), 5_000)
-        compose.onNodeWithText("Average tip").assertExists()
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Average tip"))
+        compose.onNodeWithText("Bills").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Nothing repeats regularly yet", substring = true), 5_000)
+        compose.onNodeWithText("Future").performClick()
+        compose.waitUntilAtLeastOneExists(hasText("projected forward here", substring = true), 5_000)
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
         compose.waitUntilAtLeastOneExists(hasText("No receipts yet"), 5_000)
