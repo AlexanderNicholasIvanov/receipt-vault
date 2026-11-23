@@ -193,8 +193,19 @@ object ReceiptParser {
 
     private val MERCHANT_SKIP = Regex("""\b(receipt|welcome|thank|thanks|store\s*#|store\s+no|tel|phone|fax|www|http|\.com|order|server|table|guest|check\s*#|cashier|invoice|transaction|trans\b|terminal|reg\b|register|date|time|copy|customer|merchant\s+id|mid\b|tid\b|ticket|host|station)\b""")
 
+    // Order-type banners ("Eat In", "To Go") are printed large at the top of fast-food receipts.
+    private val ORDER_TYPE = Regex("""^\W*(eat\s*in|dine\s*in|for\s+here|to\s*go|take\s*-?\s*(out|away)|carry\s*-?\s*out|drive\s*-?\s*thr(u|ough)|pick\s*-?\s*up|delivery)\W*$""")
+
+    // "Welcome to Dunkin'": the store names itself in the greeting.
+    private val WELCOME_TO = Regex("""^\W*welcome\s+to\s+(.+)$""", RegexOption.IGNORE_CASE)
+    private val WELCOME_GENERIC = Regex("""^(our|the|my|your)\b""", RegexOption.IGNORE_CASE)
+
     private fun findMerchant(rows: List<Row>): String? {
         val head = rows.take(8)
+        head.firstNotNullOfOrNull { r ->
+            WELCOME_TO.find(r.text)?.groupValues?.get(1)?.trim()?.trimEnd('!', '.', ',')?.trim()
+                ?.takeIf { it.count(Char::isLetter) >= 3 && !WELCOME_GENERIC.containsMatchIn(it) && !MERCHANT_SKIP.containsMatchIn(it.lowercase()) }
+        }?.let { return tidyName(it) }
         val candidates = head.filter { r ->
             val letters = r.text.count { it.isLetter() }
             letters >= 3 &&
@@ -202,6 +213,7 @@ object ReceiptParser {
                 r.amounts.isEmpty() &&
                 r.kind == Kind.NONE &&
                 !MERCHANT_SKIP.containsMatchIn(r.lower) &&
+                !ORDER_TYPE.containsMatchIn(r.lower) &&
                 !PHONE.containsMatchIn(r.text) &&
                 !STREET.containsMatchIn(r.lower) &&
                 !CITY_STATE_ZIP.containsMatchIn(r.text) &&
@@ -328,17 +340,25 @@ object ReceiptParser {
     private val SKU_PREFIX = Regex("""^\s*\d{4,}\s+""")
     private val TRAILING_FLAGS = Regex("""(\s+[A-Z]{1,2})+\s*$""")
 
+    // "1 Md Ice Cloud Latte  6.19": a bare quantity column in front of the name (fast-food POS).
+    private val QTY_COLUMN = Regex("""^\s*(\d{1,2})\s+(?=\d*[A-Za-z])""")
+
     private fun findItems(rows: List<Row>): List<ParsedItem> {
         val stop = rows.indexOfFirst { it.kind in setOf(Kind.SUBTOTAL, Kind.TOTAL, Kind.TAX) && it.amount != null }
         val body = if (stop >= 0) rows.subList(0, stop) else emptyList()
-        return body.asSequence()
+        val candidates = body
             .filter { it.kind == Kind.NONE && it.amounts.isNotEmpty() && !it.inTipGuide }
             .filter { it.label.count { c -> c.isLetter() } >= 2 }
             .filterNot { PHONE.containsMatchIn(it.text) || DATE_PATTERNS.any { p -> p.containsMatchIn(it.lower) } }
+        // Only a column when every item row starts with one; a lone "7 Up" is a name, not a quantity.
+        val qtyColumn = candidates.size >= 2 &&
+            candidates.all { QTY_COLUMN.containsMatchIn(it.label) && !QTY_PREFIX.containsMatchIn(it.label) }
+        return candidates.asSequence()
             .mapNotNull { r ->
                 var name = r.label
                 var qty = 1
                 QTY_PREFIX.find(name)?.let { qty = it.groupValues[1].toInt(); name = name.substring(it.range.last + 1) }
+                if (qtyColumn) QTY_COLUMN.find(name)?.let { qty = it.groupValues[1].toInt(); name = name.substring(it.range.last + 1) }
                 QTY_AT.find(r.text)?.let { qty = it.groupValues[1].toInt() }
                 name = name.replace(Regex("""\s*\d{1,3}\s*@.*$"""), "")
                 name = SKU_PREFIX.replace(name, "")
