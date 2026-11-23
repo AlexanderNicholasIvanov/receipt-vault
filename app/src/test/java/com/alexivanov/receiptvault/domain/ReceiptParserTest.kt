@@ -269,4 +269,70 @@ class ReceiptParserTest {
         val r = ReceiptParser.parseText("Magasin\nTV 1 234,56\nTOTAL 1 234,56", today)
         assertEquals(123456L, r.totalCents)
     }
+
+    @Test
+    fun `fast-food receipt names the store from its greeting and reads the quantity column`() {
+        val text = """
+            Welcome to Dunkin'
+            Store #: 364243
+            20789 Great Falls Plaza
+            Sterling, VA 20165
+            1315916 Redin
+            CHK 1555
+            11/23/2026 12:28 PM
+            Eat In
+            1 Md Ice Cloud Latte 6.19
+            Espresso
+            3 Cookie Btr Syr
+            Milk
+            1 SsgEggChs 5.59
+            English Muffin
+            Fried Egg
+            1 6pc HshBrns 1.99
+            1 SsgEggChs 5.59
+            Croissant
+            Visa ${'$'}20.52
+            ************3080
+            Tran Type : Purchase
+            Entry Mode : TAPPED
+            Auth Code : 02024C
+            AID: A0000000031010
+            I agree to pay the above total
+            amount according to the card
+            Subtotal ${'$'}19.36
+            Virginia State Tax ${'$'}1.16
+            Payment ${'$'}20.52
+            Change Due ${'$'}0.00
+            ----------- Check Closed -----------
+            11/23/2026 12:29 PM
+            Survey Code: 55501-64243-1211-2367
+            Check # 1555
+            Total Items: 4
+        """.trimIndent()
+
+        val r = ReceiptParser.parseText(text, LocalDate.of(2026, 11, 23))
+
+        assertEquals("Dunkin'", r.merchant)
+        assertEquals("20789 Great Falls Plaza, Sterling, VA 20165", r.address)
+        assertEquals(1936L, r.subtotalCents)
+        assertEquals(116L, r.taxCents)
+        assertEquals(2052L, r.totalCents)
+        assertEquals(LocalDate.of(2026, 11, 23), r.date)
+        assertEquals(LocalTime.of(12, 28), r.time)
+        assertEquals(listOf("Md Ice Cloud Latte", "SsgEggChs", "6pc HshBrns", "SsgEggChs"), r.items.map { it.name })
+        assertEquals(listOf(619L, 559L, 199L, 559L), r.items.map { it.priceCents })
+        assertEquals(Category.DINING, r.category)
+    }
+
+    @Test
+    fun `an order-type banner is not the store name`() {
+        val r = ReceiptParser.parseText("EAT IN\nTaco Stand\nTaco 3.00\nTOTAL 3.00", today)
+        assertEquals("Taco Stand", r.merchant)
+    }
+
+    @Test
+    fun `a single item starting with a number keeps its name`() {
+        val r = ReceiptParser.parseText("Deli\n7 Up 1.99\nTOTAL 1.99", today)
+        assertEquals(listOf("7 Up"), r.items.map { it.name })
+    }
 }
